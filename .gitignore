@@ -1,0 +1,19 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (contienen secretos, no versionar)
+.env
+
+# Entornos de construcción
+dist/
+build/
+
+# Archivos excluidos del repositorio por decisión del proyecto
+AGENTS.md
+CHANGELOG.md
+opencode.json
+
+# Logs y archivos temporales
+*.log
+npm-debug.log*
+.DS_Store

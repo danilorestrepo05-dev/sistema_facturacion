@@ -1,0 +1,245 @@
+/* src/index.css
+   Estilos globales del frontend. */
+:root {
+  --color-sidebar: #1e293b;
+  --color-sidebar-activo: #0d6efd;
+}
+
+body {
+  margin: 0;
+  background-color: #f1f5f9;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Estructura principal con barra lateral fija */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-sidebar {
+  width: 230px;
+  min-width: 230px;
+  background: var(--color-sidebar);
+  color: #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+/* El menú móvil (Offcanvas) comparte colores y tipografía con la barra lateral. */
+.app-sidebar-offcanvas {
+  background: var(--color-sidebar);
+  color: #cbd5e1;
+  width: 260px !important;
+  --bs-offcanvas-color: #cbd5e1;
+}
+
+.app-sidebar .marca,
+.app-sidebar-offcanvas .marca {
+  padding: 1.1rem 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  font-size: 1.05rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.app-sidebar .nav-link,
+.app-sidebar-offcanvas .nav-link {
+  color: #cbd5e1;
+  border-radius: 0.4rem;
+  margin: 0.15rem 0.6rem;
+  padding: 0.55rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.app-sidebar .nav-link:hover,
+.app-sidebar-offcanvas .nav-link:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.app-sidebar .nav-link.activo,
+.app-sidebar-offcanvas .nav-link.activo {
+  color: #fff;
+  background: var(--color-sidebar-activo);
+}
+
+.app-contenido {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-topbar {
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-main {
+  padding: 1.5rem;
+  flex: 1;
+}
+
+/* En pantallas muy pequeñas se reduce el margen del contenido. */
+@media (max-width: 575.98px) {
+  .app-main {
+    padding: 1rem;
+  }
+}
+
+/* Tarjetas de indicadores (KPIs) */
+.card-kpi {
+  border: none;
+  border-radius: 0.9rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.card-kpi .kpi-icono {
+  width: 48px;
+  height: 48px;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+
+.card-kpi .kpi-valor {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.card-kpi .kpi-etiqueta {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+/* Contenedores de gráficos (necesitan altura fija) */
+.contenedor-grafico {
+  width: 100%;
+  height: 280px;
+}
+
+.contenedor-grafico-sm {
+  width: 100%;
+  height: 240px;
+}
+
+/* Tablas más cómodas */
+.tabla-acciones .btn {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.85rem;
+}
+
+/* Caja (POS) */
+.pos-tarjeta-producto {
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  height: 100%;
+}
+
+.pos-tarjeta-producto:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.pos-busqueda {
+  max-width: 320px;
+}
+
+/* Sección solo para impresión (oculta en pantalla) */
+.seccion-impresion {
+  display: none;
+}
+
+/* Impresión: oculta menú, topbar, pantalla y muestra el reporte en tablas. */
+@media print {
+  .app-sidebar,
+  .app-topbar,
+  .offcanvas,
+  .offcanvas-backdrop,
+  .no-print,
+  .contenido-pantalla {
+    display: none !important;
+  }
+
+  .app-layout {
+    display: block;
+  }
+
+  .app-main {
+    padding: 0;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  /* Contenido imprimible: reporte de la pestaña activa en tablas. */
+  .seccion-impresion {
+    display: block;
+  }
+
+  .impresion-reporte {
+    margin: 0 auto;
+    max-width: 100%;
+  }
+
+  .impresion-reporte h5 {
+    margin: 0 0 0.25rem;
+    font-size: 15px;
+  }
+
+  .impresion-reporte h6 {
+    margin: 0.9rem 0 0.3rem;
+    font-size: 13px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 2px;
+  }
+
+  .impresion-subtitulo {
+    margin: 0 0 0.9rem;
+    font-size: 11px;
+    color: #444;
+  }
+
+  .tabla-impresion {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-bottom: 0.75rem;
+  }
+
+  .tabla-impresion th,
+  .tabla-impresion td {
+    border: 1px solid #333;
+    padding: 3px 6px;
+  }
+
+  .tabla-impresion th {
+    background: #eee;
+    text-align: left;
+  }
+
+  .tabla-impresion .text-end {
+    text-align: right;
+  }
+
+  .tabla-resumen td {
+    font-weight: 700;
+  }
+}

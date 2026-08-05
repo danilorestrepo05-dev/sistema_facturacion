@@ -1,0 +1,24 @@
+{
+  "name": "sistema-facturacion-backend",
+  "version": "0.1.0",
+  "description": "API REST del Sistema de Facturación (usuarios y login). Backend Express + MySQL.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed": "node scripts/crear-admin.js",
+    "db:schema": "mysql -u root -e \"source sql/01_schema.sql\"",
+    "audit": "npm audit"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.12.0",
+    "pdfkit": "^0.19.1"
+  }
+}

@@ -1,0 +1,9 @@
+# Dependencias
+node_modules/
+
+# Entornos de construcción
+dist/
+
+# Logs y archivos temporales
+*.log
+.DS_Store
