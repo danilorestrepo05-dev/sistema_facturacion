@@ -1,0 +1,15 @@
+allowBuilds:
+  esbuild: set this to true or false
+# pnpm 11: node_modules plano (sin junctions/symlinks de .pnpm)
+# Evita errores EPERM de symlink en Windows y facilita copiar node_modules.
+nodeLinker: hoisted
+# No reinstalar automáticamente antes de correr scripts (evita re-descargas innecesarias)
+verifyDepsBeforeRun: false
+# Solo instalar los paquetes opcionales de la plataforma actual (Windows x64)
+supportedArchitectures:
+  os:
+    - current
+  cpu:
+    - current
+  libc:
+    - current

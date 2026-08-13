@@ -26,18 +26,18 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
    ```powershell
    Get-Content backend\sql\01_schema.sql -Raw | & C:\xampp\mysql\bin\mysql.exe -u root
    ```
-2. Instalar dependencias:
+2. Instalar dependencias (pnpm v11, activado vía corepack):
    ```powershell
-   cd backend; npm install
+   cd backend; pnpm install
    ```
 3. Crear el usuario administrador (contraseña por defecto `admin123`):
    ```powershell
-   npm run seed
+   pnpm run seed
    ```
 4. Copiar `backend\.env.example` a `backend\.env` y ajustar valores.
 5. Iniciar la API:
    ```powershell
-   npm run dev
+   pnpm run dev
    ```
 
 ## Endpoints disponibles
@@ -66,12 +66,18 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 
 1. Instalar dependencias:
    ```powershell
-   cd frontend; npm install
+   cd frontend; pnpm install
    ```
 2. Iniciar el servidor de desarrollo (proxy `/api` hacia el backend en `127.0.0.1:3000`):
    ```powershell
-   npm run dev
+   pnpm run dev
    ```
 3. Abrir `http://localhost:5173` e iniciar sesión con las credenciales del backend (p. ej. `admin` / `admin123`).
 
-> Nota: el backend debe estar corriendo para el inicio de sesión y las operaciones. Para producción se puede compilar con `npm run build` (genera `dist/`).
+> Nota: el backend debe estar corriendo para el inicio de sesión y las operaciones. Para producción se puede compilar con `pnpm run build` (genera `dist/`).
+
+## Gestión de dependencias
+- El proyecto usa **pnpm v11** (ver `packageManager` en cada `package.json`; instala con `corepack enable pnpm`).
+- Lockfiles versionados: `backend/pnpm-lock.yaml` y `frontend/pnpm-lock.yaml`.
+- Auditoría de seguridad: `pnpm audit` (dentro de `backend/` o `frontend/`).
+- `node_modules` plano (`nodeLinker: hoisted` en `pnpm-workspace.yaml`) para evitar errores de symlink en Windows.
