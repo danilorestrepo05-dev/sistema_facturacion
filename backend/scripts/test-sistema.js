@@ -89,6 +89,17 @@ async function main() {
   const sinToken = await peticion('GET', '/productos', null);
   ok('Endpoint sin token rechazado (401)', sinToken.status === 401);
 
+  // Usuario inactivo no puede iniciar sesión (v0.9.11).
+  const usuarioInactivo = `inactivo_${sufijo}`;
+  const crearInactivo = await peticion('POST', '/usuarios', tokenAdmin, {
+    nombre_usuario: usuarioInactivo, nombre_completo: 'Usuario inactivo', contrasena: 'Inactivo123!', rol: 'cajero', activo: 0
+  });
+  ok('Crear usuario inactivo (admin)', crearInactivo.status === 201);
+  const idInactivo = crearInactivo.datos.datos.id;
+
+  const loginInactivo = await peticion('POST', '/auth/login', null, { nombre_usuario: usuarioInactivo, contrasena: 'Inactivo123!' });
+  ok('Usuario inactivo NO puede iniciar sesión (403)', loginInactivo.status === 403);
+
   console.log('\n=== 3. Catálogo (categorías, impuestos, productos) ===');
 
   const nuevaCategoria = await peticion('POST', '/categorias', tokenAdmin, {
@@ -121,8 +132,35 @@ async function main() {
   ok('Crear producto 2', producto2.status === 201);
   const idProducto2 = producto2.datos.datos.id;
 
-  const sinCodigo = await peticion('POST', '/productos', tokenAdmin, { nombre: 'Sin codigo' });
-  ok('Producto sin código rechazado (400)', sinCodigo.status === 400);
+  const auto = await peticion('POST', '/productos', tokenAdmin, { nombre: `AutoCodigo ${sufijo}`, precio_venta: 1200 });
+  ok('Producto sin código se autogenera (PRO-xxx)', auto.status === 201 && /^PRO-\d+$/.test(auto.datos.datos.codigo),
+    `codigo=${auto.datos.datos.codigo}`);
+  const idAuto = auto.datos.datos.id;
+
+  const sinPrecio = await peticion('POST', '/productos', tokenAdmin, { nombre: 'Sin precio' });
+  ok('Producto sin precio rechazado (400)', sinPrecio.status === 400);
+
+  // Producto inactivo no se ofrece en venta (v0.9.11).
+  const cuerpoProducto1 = {
+    codigo: producto1.datos.datos.codigo,
+    nombre: producto1.datos.datos.nombre,
+    descripcion: producto1.datos.datos.descripcion,
+    categoria_id: producto1.datos.datos.categoria_id,
+    impuesto_id: producto1.datos.datos.impuesto_id,
+    precio_compra: producto1.datos.datos.precio_compra,
+    precio_venta: producto1.datos.datos.precio_venta,
+    stock_actual: producto1.datos.datos.stock_actual,
+    stock_minimo: producto1.datos.datos.stock_minimo,
+    unidad_medida: producto1.datos.datos.unidad_medida
+  };
+  const desactivarProducto = await peticion('PUT', `/productos/${idProducto1}`, tokenAdmin, { ...cuerpoProducto1, activo: 0 });
+  ok('Desactivar producto (admin)', desactivarProducto.status === 200);
+
+  const venderInactivo = await peticion('POST', '/facturas', tokenCajero, { items: [{ producto_id: idProducto1, cantidad: 1 }] });
+  ok('Vender producto inactivo rechazado (404)', venderInactivo.status === 404);
+
+  const reactivarProducto = await peticion('PUT', `/productos/${idProducto1}`, tokenAdmin, { ...cuerpoProducto1, activo: 1 });
+  ok('Reactivar producto para el flujo', reactivarProducto.status === 200);
 
   const buscado = await peticion('GET', `/productos?termino=${encodeURIComponent(producto1.datos.datos.nombre)}`, tokenAdmin);
   ok('Búsqueda de producto por nombre', buscado.datos.datos.some((p) => p.id === idProducto1));
@@ -135,6 +173,22 @@ async function main() {
   });
   ok('Crear cliente', nuevoCliente.status === 201);
   const idCliente = nuevoCliente.datos.datos.id;
+
+  // Cliente inactivo no puede comprar (v0.9.11).
+  const desactivarCliente = await peticion('PUT', `/clientes/${idCliente}`, tokenAdmin, {
+    nombre: nuevoCliente.datos.datos.nombre, activo: 0
+  });
+  ok('Desactivar cliente (admin)', desactivarCliente.status === 200);
+
+  const venderClienteInactivo = await peticion('POST', '/facturas', tokenCajero, {
+    cliente_id: idCliente, items: [{ producto_id: idProducto1, cantidad: 1 }]
+  });
+  ok('Vender a cliente inactivo rechazado (404)', venderClienteInactivo.status === 404);
+
+  const reactivarCliente = await peticion('PUT', `/clientes/${idCliente}`, tokenAdmin, {
+    nombre: nuevoCliente.datos.datos.nombre, activo: 1
+  });
+  ok('Reactivar cliente para el flujo', reactivarCliente.status === 200);
 
   const nuevoProveedor = await peticion('POST', '/proveedores', tokenAdmin, {
     nombre: `Proveedor Test ${sufijo}`, tipo_documento: 'NIT', documento: String(900000000 + sufijo),
@@ -230,6 +284,9 @@ async function main() {
 
   console.log('\n=== 9. Anulación y consistencia ===');
 
+  const anularCajero = await peticion('POST', `/facturas/${idFactura}/anular`, tokenCajero);
+  ok('Cajero NO puede anular factura (403)', anularCajero.status === 403);
+
   const anular = await peticion('POST', `/facturas/${idFactura}/anular`, tokenAdmin);
   ok('Anular factura', anular.status === 200 && anular.datos.datos.estado === 'anulada');
 
@@ -249,12 +306,14 @@ async function main() {
 
   await peticion('DELETE', `/productos/${idProducto2}`, tokenAdmin);
   await peticion('DELETE', `/productos/${idProducto1}`, tokenAdmin);
+  await peticion('DELETE', `/productos/${idAuto}`, tokenAdmin);
   const borrarProv = await peticion('DELETE', `/proveedores/${idProveedor}`, tokenAdmin);
   const borrarCli = await peticion('DELETE', `/clientes/${idCliente}`, tokenAdmin);
   const borrarImp = await peticion('DELETE', `/impuestos/${idImpuesto}`, tokenAdmin);
   const borrarCat = await peticion('DELETE', `/categorias/${idCategoria}`, tokenAdmin);
   const borrarUser = await peticion('DELETE', `/usuarios/${idCajero}`, tokenAdmin);
-  ok('Limpieza completa', [borrarProv, borrarCli, borrarImp, borrarCat, borrarUser].every((r) => r.status === 200));
+  const borrarInactivo = await peticion('DELETE', `/usuarios/${idInactivo}`, tokenAdmin);
+  ok('Limpieza completa', [borrarProv, borrarCli, borrarImp, borrarCat, borrarUser, borrarInactivo].every((r) => r.status === 200));
 
   console.log(`\nRESULTADO: ${pasos} pasos, ${fallos} fallos.`);
   console.log(`Factura de prueba (queda como anulada): No. ${numeroFactura}`);

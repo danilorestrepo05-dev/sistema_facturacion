@@ -81,6 +81,17 @@ const crear = async (datos, usuarioId) => {
   try {
     await conexion.beginTransaction();
 
+    // Si se indica cliente, debe existir y estar activo (un cliente inactivo no puede comprar).
+    if (cliente_id) {
+      const [clientes] = await conexion.query(
+        'SELECT id FROM clientes WHERE id = ? AND activo = 1',
+        [cliente_id]
+      );
+      if (!clientes[0]) {
+        throw Object.assign(new Error('Cliente no encontrado o inactivo'), { status: 404 });
+      }
+    }
+
     // Calcula el siguiente número consecutivo (bloquea la última factura para evitar duplicados).
     const [ultima] = await conexion.query(
       'SELECT numero_factura FROM facturas ORDER BY numero_factura DESC LIMIT 1 FOR UPDATE'

@@ -14,6 +14,16 @@ const listar = async (req, res, next) => {
   }
 };
 
+// GET /api/v1/productos/siguiente-codigo
+const siguienteCodigo = async (req, res, next) => {
+  try {
+    const codigo = await productoModel.siguienteCodigo();
+    return jsonExito(res, { codigo }, 'Código generado');
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // GET /api/v1/productos/:id
 const obtener = async (req, res, next) => {
   try {
@@ -33,6 +43,11 @@ const obtener = async (req, res, next) => {
 const crear = async (req, res, next) => {
   try {
     const datos = req.body || {};
+
+    // Si no se envía un código, se autogenera el siguiente correlativo (PRO-001, ...).
+    if (!datos.codigo || !String(datos.codigo).trim()) {
+      datos.codigo = await productoModel.siguienteCodigo();
+    }
 
     const errorValidacion = validarProducto(datos);
     if (errorValidacion) {
@@ -120,4 +135,4 @@ function normalizar(datos) {
   };
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+module.exports = { listar, siguienteCodigo, obtener, crear, actualizar, eliminar };

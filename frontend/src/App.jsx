@@ -2,6 +2,7 @@
 // Define las rutas de la aplicación.
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import ProtectedRoute from './components/ProtectedRoute';
+import RutaAdmin from './components/RutaAdmin';
 import Layout from './components/Layout';
 import Login from './views/Login';
 import Dashboard from './views/Dashboard';
@@ -36,7 +37,14 @@ const App = () => (
         <Route path="clientes" element={<Clientes />} />
         <Route path="proveedores" element={<Proveedores />} />
         <Route path="reportes" element={<Reportes />} />
-        <Route path="usuarios" element={<Usuarios />} />
+        <Route
+          path="usuarios"
+          element={
+            <RutaAdmin>
+              <Usuarios />
+            </RutaAdmin>
+          }
+        />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

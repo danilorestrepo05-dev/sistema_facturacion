@@ -9,6 +9,7 @@ const router = Router();
 
 // Lectura: cualquier usuario autenticado.
 router.get('/', verificarToken, productoController.listar);
+router.get('/siguiente-codigo', verificarToken, productoController.siguienteCodigo);
 router.get('/:id', verificarToken, productoController.obtener);
 
 // Escritura: solo administrador.

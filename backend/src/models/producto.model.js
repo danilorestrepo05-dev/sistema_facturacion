@@ -85,4 +85,20 @@ const eliminar = async (id) => {
   return resultado.affectedRows > 0;
 };
 
-module.exports = { listar, buscarPorId, crear, actualizar, eliminar };
+// Prefijo usado para los códigos autogenerados de productos.
+const PREFIJO_CODIGO = 'PRO-';
+
+// Calcula el siguiente código correlativo disponible (PRO-001, PRO-002, ...).
+// Toma el máximo valor numérico de los códigos existentes con ese prefijo y suma 1.
+const siguienteCodigo = async () => {
+  const consulta = `
+    SELECT MAX(CAST(SUBSTRING(codigo, LENGTH(?) + 1) AS UNSIGNED)) AS maximo
+    FROM productos
+    WHERE codigo REGEXP '^PRO-[0-9]+$'`;
+
+  const [filas] = await pool.query(consulta, [PREFIJO_CODIGO]);
+  const maximo = filas[0].maximo || 0;
+  return `${PREFIJO_CODIGO}${String(maximo + 1).padStart(3, '0')}`;
+};
+
+module.exports = { listar, buscarPorId, crear, actualizar, eliminar, siguienteCodigo };

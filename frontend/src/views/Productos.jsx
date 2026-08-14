@@ -46,17 +46,58 @@ const Productos = () => {
     }
   };
 
-  const abrirNuevo = () => {
+  // Devuelve el id del impuesto por defecto para un producto nuevo:
+  // el primer impuesto activo; si no hay activos, el "Exento"; si tampoco existe, vacío.
+  const impuestoPorDefecto = () =>
+    impuestos.find((i) => i.activo === 1)?.id ??
+    impuestos.find((i) => String(i.nombre).toLowerCase() === 'exento')?.id ??
+    '';
+
+  // Categorías visibles en el select: solo las activas. Si se está editando y la
+  // categoría actual quedó inactiva, se conserva (marcada) para no perder la referencia.
+  const categoriasVisibles = () => {
+    const activas = categorias.filter((c) => c.activo === 1);
+    if (editando && form.categoria_id) {
+      const actual = categorias.find((c) => c.id === Number(form.categoria_id));
+      if (actual && actual.activo !== 1 && !activas.some((c) => c.id === actual.id)) {
+        return [...activas, actual];
+      }
+    }
+    return activas;
+  };
+
+  // Impuestos visibles en el select: solo los activos, más el seleccionado si quedó inactivo.
+  const impuestosVisibles = () => {
+    const activos = impuestos.filter((i) => i.activo === 1);
+    if (editando && form.impuesto_id) {
+      const actual = impuestos.find((i) => i.id === Number(form.impuesto_id));
+      if (actual && actual.activo !== 1 && !activos.some((i) => i.id === actual.id)) {
+        return [...activos, actual];
+      }
+    }
+    return activos;
+  };
+
+  const abrirNuevo = async () => {
     setEditando(null);
     setForm(vacio());
     setModal(true);
+    // Precarga el impuesto por defecto (Exento) y el siguiente código correlativo (editable).
+    setForm((f) => ({ ...f, impuesto_id: impuestoPorDefecto() }));
+    try {
+      const resp = await api.get('/productos/siguiente-codigo');
+      setForm((f) => ({ ...f, codigo: resp.data.datos.codigo }));
+    } catch {
+      // Si falla, se deja vacío y el backend lo genera al guardar.
+    }
   };
 
   const abrirEditar = (p) => {
     setEditando(p);
     setForm({
       codigo: p.codigo, nombre: p.nombre, descripcion: p.descripcion || '',
-      categoria_id: p.categoria_id || '', impuesto_id: p.impuesto_id || '',
+      categoria_id: p.categoria_id || '',
+      impuesto_id: p.impuesto_id || impuestoPorDefecto(),
       precio_compra: p.precio_compra, precio_venta: p.precio_venta,
       stock_actual: p.stock_actual, stock_minimo: p.stock_minimo,
       unidad_medida: p.unidad_medida, activo: p.activo
@@ -151,8 +192,9 @@ const Productos = () => {
                     <td className="text-end">{formatoMoneda(p.precio_compra)}</td>
                     <td className="text-end">{formatoMoneda(p.precio_venta)}</td>
                     <td className="text-end">
-                      <Badge bg={p.stock_actual <= p.stock_minimo ? 'warning' : 'light'}>
-                        {p.stock_actual}
+                      <Badge bg={(p.stock_actual ?? 0) <= (p.stock_minimo ?? 0) ? 'warning' : 'light'} text="dark"
+                        title={`Stock actual: ${p.stock_actual ?? 0}`}>
+                        {p.stock_actual ?? 0}
                       </Badge>
                     </td>
                     <td><Badge bg={p.activo === 1 ? 'success' : 'secondary'}>{p.activo === 1 ? 'Activo' : 'Inactivo'}</Badge></td>
@@ -183,9 +225,10 @@ const Productos = () => {
           <Modal.Body>
             <Row className="g-3">
               <Col md={4}>
-                <Form.Label>Código *</Form.Label>
-                <Form.Control required value={form.codigo}
+                <Form.Label>Código</Form.Label>
+                <Form.Control value={form.codigo}
                   onChange={(e) => setForm({ ...form, codigo: e.target.value })} />
+                <Form.Text className="text-muted">Autogenerado, puedes editarlo.</Form.Text>
               </Col>
               <Col md={8}>
                 <Form.Label>Nombre *</Form.Label>
@@ -202,15 +245,22 @@ const Productos = () => {
                 <Form.Select value={form.categoria_id}
                   onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}>
                   <option value="">Sin categoría</option>
-                  {categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  {categoriasVisibles().map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}{c.activo !== 1 ? ' (inactivo)' : ''}
+                    </option>
+                  ))}
                 </Form.Select>
               </Col>
               <Col md={6}>
                 <Form.Label>Impuesto</Form.Label>
                 <Form.Select value={form.impuesto_id}
                   onChange={(e) => setForm({ ...form, impuesto_id: e.target.value })}>
-                  <option value="">Sin impuesto</option>
-                  {impuestos.map((i) => <option key={i.id} value={i.id}>{i.nombre} ({i.porcentaje}%)</option>)}
+                  {impuestosVisibles().map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.nombre} ({i.porcentaje}%){i.activo !== 1 ? ' (inactivo)' : ''}
+                    </option>
+                  ))}
                 </Form.Select>
               </Col>
               <Col md={3}>
@@ -235,7 +285,7 @@ const Productos = () => {
               </Col>
               <Col md={2}>
                 <Form.Label>Unidad</Form.Label>
-                <Form.Control value={form.unidad_medida}
+                <Form.Control value={form.unidad_medida} placeholder="Ej. unidad, kg, lb…"
                   onChange={(e) => setForm({ ...form, unidad_medida: e.target.value })} />
               </Col>
               <Col md={12}>
@@ -256,7 +306,7 @@ const Productos = () => {
 
 const vacio = () => ({
   codigo: '', nombre: '', descripcion: '', categoria_id: '', impuesto_id: '',
-  precio_compra: 0, precio_venta: '', stock_actual: 0, stock_minimo: 0,
+  precio_compra: '', precio_venta: '', stock_actual: 0, stock_minimo: 0,
   unidad_medida: 'unidad', activo: 1
 });
 

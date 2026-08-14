@@ -80,7 +80,10 @@ export const abrirTicketFactura = async (id, ancho = 80) => {
       pre.textContent = texto;
     } else {
       // Limpia los comandos ESC/POS y demás bytes de control, conservando saltos.
+      // El ticket inicia con "ESC @" (comando de inicialización de la impresora);
+      // si solo se quita el byte ESC queda un "@" suelto al inicio del texto.
       pre.textContent = texto
+        .replace(/\x1b@/g, '')
         .replace(/\x1b/g, '')
         .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
         .replace(/\r\n/g, '\n')

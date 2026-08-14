@@ -221,7 +221,7 @@ const Caja = () => {
                   <Form.Label className="small">Cliente</Form.Label>
                   <Form.Select size="sm" value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
                     <option value="">Consumidor final</option>
-                    {clientes.map((c) => (
+                    {clientes.filter((c) => c.activo === 1).map((c) => (
                       <option key={c.id} value={c.id}>{c.nombre}</option>
                     ))}
                   </Form.Select>

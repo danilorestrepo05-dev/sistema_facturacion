@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const usuarioModel = require('../models/usuario.model');
 const { jsonExito, jsonError } = require('../utils/response');
 
-const ROLES = ['admin', 'cajero', 'invitado'];
+const ROLES = ['admin', 'cajero'];
 
 // GET /api/v1/usuarios?termino=...
 const listar = async (req, res, next) => {

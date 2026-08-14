@@ -1,6 +1,6 @@
 # Sistema de Facturación e Inventario
 
-> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.6. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
+> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.11. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
 
 Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Monorepo Full-Stack JS). Diseñado de forma genérica para que pueda adaptarse a otros modelos de negocio (café, peluquería, tienda, etc.) cambiando únicamente registros de la base de datos y variables de entorno.
 
@@ -9,10 +9,12 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 - **Backend:** Node.js + Express 5 (`backend/`).
 - **Frontend:** React + Vite + Bootstrap 5 (`frontend/`, en desarrollo).
 
-## Estado actual (v0.9.6)
+## Estado actual (v0.9.11)
 - Base de datos `sistema_facturacion` con tablas `usuarios`, `impuestos`, `categorias`, `productos`, `clientes`, `proveedores`, `facturas`, `detalles_factura` y `movimientos_inventario`.
 - Backend con autenticación JWT + bcrypt.
-- Gestión de usuarios (solo admin): crear, editar, desactivar y cambiar contraseñas desde la interfaz.
+- **Roles `admin` y `cajero`**: toda escritura (catálogo, contactos, usuarios, anulación de factura, backup) exige rol administrador en el backend (403). En el frontend, las rutas de administración (`/usuarios`) están protegidas por un guard por rol (`RutaAdmin`): un cajero no puede acceder por URL.
+- **Flag activo/inactivo funcional en todos los módulos**: los registros inactivos no se ofrecen en los flujos operativos (un producto inactivo no se vende, un cliente inactivo no se selecciona en Caja, los selects de categoría e impuesto solo muestran activos); los listados de gestión los siguen mostrando para poder reactivarlos.
+- **Autogeneración de código de producto** (`PRO-001`, `PRO-002`, ...) con precarga editable en el formulario.
 - Catálogo (categorías, impuestos, productos) y contactos (clientes, proveedores) con CRUD protegido por roles.
 - Facturación transaccional: emisión con descuento de stock y movimientos de inventario, consulta y anulación.
 - Impresión: PDF Carta/Media carta y ticket POS térmico (58/80mm).
@@ -47,6 +49,7 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 | POST   | `/api/v1/auth/login` | Inicio de sesión (`nombre_usuario`, `contrasena`) | No |
 | GET    | `/api/v1/auth/perfil`| Perfil del usuario autenticado     | Token JWT (Bearer) |
 | GET/POST | `/api/v1/categorias`, `/api/v1/impuestos`, `/api/v1/productos` | Catálogo (listar/crear) | Token JWT |
+| GET | `/api/v1/productos/siguiente-codigo` | Código correlativo sugerido para un producto nuevo | Token JWT |
 | GET/PUT/DELETE | `/api/v1/categorias/:id`, `/api/v1/impuestos/:id`, `/api/v1/productos/:id` | Catálogo (ver/editar/eliminar) | Token JWT (PUT/DELETE: admin) |
 | GET/POST | `/api/v1/clientes`, `/api/v1/proveedores` | Contactos (listar/crear) | Token JWT |
 | GET/PUT/DELETE | `/api/v1/clientes/:id`, `/api/v1/proveedores/:id` | Contactos (ver/editar/eliminar) | Token JWT (PUT/DELETE: admin) |

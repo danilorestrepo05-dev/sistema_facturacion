@@ -7,7 +7,7 @@ import {
 import api from '../services/api';
 import { formatoFechaHora } from '../utils/format';
 
-const ROLES = ['admin', 'cajero', 'invitado'];
+const ROLES = ['admin', 'cajero'];
 
 const Usuarios = () => {
   const [usuarios, setUsuarios] = useState([]);
@@ -80,7 +80,7 @@ const Usuarios = () => {
   };
 
   const badgeRol = (rol) => {
-    const variantes = { admin: 'danger', cajero: 'primary', invitado: 'secondary' };
+    const variantes = { admin: 'danger', cajero: 'primary' };
     return <Badge bg={variantes[rol] || 'secondary'} className="text-capitalize">{rol}</Badge>;
   };
 
