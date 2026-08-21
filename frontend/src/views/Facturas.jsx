@@ -221,6 +221,7 @@ const Facturas = () => {
                     <th>Cant</th><th>Producto</th>
                     <th className="text-end">Vlr. Unit</th>
                     <th className="text-end">IVA %</th>
+                    <th className="text-end">Desc.</th>
                     <th className="text-end">Total</th>
                   </tr>
                 </thead>
@@ -231,6 +232,9 @@ const Facturas = () => {
                       <td>{d.producto_nombre}</td>
                       <td className="text-end">{formatoMoneda(d.precio_unitario)}</td>
                       <td className="text-end">{d.impuesto_porcentaje}%</td>
+                      <td className="text-end">
+                        {Number(d.descuento) > 0 ? `- ${formatoMoneda(d.descuento)}` : '—'}
+                      </td>
                       <td className="text-end">{formatoMoneda(d.subtotal)}</td>
                     </tr>
                   ))}
@@ -239,7 +243,7 @@ const Facturas = () => {
               <div className="text-end small">
                 <div>Subtotal: {formatoMoneda(detalle.subtotal)}</div>
                 <div>Impuestos: {formatoMoneda(detalle.impuesto_total)}</div>
-                {Number(detalle.descuento) > 0 && <div>Descuento: - {formatoMoneda(detalle.descuento)}</div>}
+                <DesgloseDescuento factura={detalle} />
                 <div className="fw-bold fs-5">Total: {formatoMoneda(detalle.total)}</div>
               </div>
             </>
@@ -265,3 +269,21 @@ const Facturas = () => {
 };
 
 export default Facturas;
+
+// Desglose del descuento de la factura: separa el descuento aplicado por línea
+// (suma de los descuentos de los items) del descuento adicional de factura.
+const DesgloseDescuento = ({ factura }) => {
+  const descLineas = (factura.detalles || [])
+    .reduce((acc, d) => acc + (Number(d.descuento) || 0), 0);
+  const descTotal = Number(factura.descuento) || 0;
+  const descAdicional = Math.max(0, descTotal - descLineas);
+
+  if (descLineas === 0 && descAdicional === 0) return null;
+
+  return (
+    <>
+      {descLineas > 0 && <div>Descuento líneas: - {formatoMoneda(descLineas)}</div>}
+      {descAdicional > 0 && <div>Descuento adicional: - {formatoMoneda(descAdicional)}</div>}
+    </>
+  );
+};

@@ -136,7 +136,16 @@ const generarFacturaPDF = (factura, { formato = 'carta' } = {}) =>
 
     escribirTotal('Subtotal', formatearMoneda(factura.subtotal));
     escribirTotal('Impuestos', formatearMoneda(factura.impuesto_total));
-    if (Number(factura.descuento) > 0) {
+
+    // Descuento: si hay descuentos de línea y además adicional, se desglosan.
+    const descLineas = (factura.detalles || [])
+      .reduce((acc, d) => acc + (Number(d.descuento) || 0), 0);
+    const descAdicional = Math.max(0, Number(factura.descuento || 0) - descLineas);
+
+    if (descLineas > 0 && descAdicional > 0) {
+      escribirTotal('Descuento líneas', `- ${formatearMoneda(descLineas)}`);
+      escribirTotal('Descuento adicional', `- ${formatearMoneda(descAdicional)}`);
+    } else if (Number(factura.descuento) > 0) {
       escribirTotal('Descuento', `- ${formatearMoneda(factura.descuento)}`);
     }
 

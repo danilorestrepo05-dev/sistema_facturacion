@@ -76,9 +76,20 @@ const generarTicket = (factura, { ancho = '80' } = {}) => {
   lineas.push('-'.repeat(chars));
   lineas.push(`Subtotal: ${formatearMoneda(factura.subtotal)}`);
   lineas.push(`Impuestos: ${formatearMoneda(factura.impuesto_total)}`);
-  if (Number(factura.descuento) > 0) {
+
+  // Descuento: si hay descuentos de línea y además adicional, se desglosan
+  // para que el cliente entienda de dónde sale el renglón.
+  const descLineas = (factura.detalles || [])
+    .reduce((acc, d) => acc + (Number(d.descuento) || 0), 0);
+  const descAdicional = Math.max(0, Number(factura.descuento || 0) - descLineas);
+
+  if (descLineas > 0 && descAdicional > 0) {
+    lineas.push(`Descuento líneas: - ${formatearMoneda(descLineas)}`);
+    lineas.push(`Descuento adicional: - ${formatearMoneda(descAdicional)}`);
+  } else if (Number(factura.descuento) > 0) {
     lineas.push(`Descuento: - ${formatearMoneda(factura.descuento)}`);
   }
+
   lineas.push(centrar(`TOTAL: ${formatearMoneda(factura.total)}`, chars));
   lineas.push('*'.repeat(chars));
   lineas.push(centrar('¡Gracias por su compra!', chars));

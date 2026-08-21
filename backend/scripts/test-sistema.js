@@ -306,6 +306,11 @@ async function main() {
     igual(Number(facturaAmbos.datos.datos.total), 3550),
     `desc=${facturaAmbos.datos.datos?.descuento} imp=${facturaAmbos.datos.datos?.impuesto_total} total=${facturaAmbos.datos.datos?.total}`);
 
+  // El ticket de esa factura debe desglosar líneas vs adicional.
+  const ticketDesglose = await peticion('GET', `/facturas/${facturaAmbos.datos.datos.id}/ticket?ancho=80`, tokenAdmin);
+  ok('Ticket desglosa descuento de líneas y adicional',
+    ticketDesglose.status === 200 && String(ticketDesglose.datos).includes('Descuento') && String(ticketDesglose.datos).includes('adicional'));
+
   console.log('\n=== 6. Impresión: PDF y ticket POS ===');
 
   const pdfCarta = await peticion('GET', `/facturas/${idFactura}/pdf?formato=carta`, tokenAdmin);
