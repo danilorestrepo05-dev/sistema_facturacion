@@ -177,6 +177,7 @@ const Caja = () => {
                         type="number" size="sm" min={1} style={{ width: 90 }}
                         value={item.cantidad}
                         onChange={(e) => cambiarCantidad(item.producto_id, e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
                       />
                       <span className="small text-secondary ms-2">Descuento $:</span>
                       <CampoDescuento item={item} onCambiar={cambiarDescuento} />
@@ -206,7 +207,8 @@ const Caja = () => {
               <InputGroup size="sm" className="mb-3">
                 <InputGroup.Text>Descuento adicional $</InputGroup.Text>
                 <Form.Control type="number" min={0} value={descuento}
-                  onChange={(e) => setDescuento(e.target.value)} />
+                  onChange={(e) => setDescuento(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()} />
               </InputGroup>
 
               <div className="border-top pt-2">
@@ -282,6 +284,10 @@ const CampoDescuento = ({ item, onCambiar }) => {
         onCambiar(item.producto_id, e.target.value); // totales en vivo (sin tope superior)
       }}
       onBlur={alSalir}
+      // La rueda del mouse sobre un input numérico enfocado cambia el valor
+      // (paso por defecto: 1) y corrompe lo tecleado; al soltar el foco la
+      // rueda vuelve a desplazar la página normalmente.
+      onWheel={(e) => e.currentTarget.blur()}
     />
   );
 };
