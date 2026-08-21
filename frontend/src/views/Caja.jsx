@@ -7,21 +7,26 @@ import {
 } from 'react-bootstrap';
 import api from '../services/api';
 import { abrirTicketFactura, abrirPdfFactura } from '../services/impresion';
+import { useCarrito } from '../context/CarritoContext';
 import { formatoMoneda } from '../utils/format';
 
 const TIPOS_PAGO = ['efectivo', 'tarjeta', 'transferencia', 'otro'];
 
 const Caja = () => {
+  // La venta en curso vive en CarritoContext: sobrevive la navegación entre
+  // módulos y un refresco de página, y se vacía al cerrar sesión.
+  const {
+    carrito, clienteId, tipoPago, descuento, totales,
+    setClienteId, setTipoPago, setDescuento,
+    agregar, cambiarCantidad, quitar, vaciar
+  } = useCarrito();
+
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
   const [termino, setTermino] = useState('');
-  const [carrito, setCarrito] = useState([]); // [{ producto_id, nombre, precio, impuesto_porcentaje, cantidad, stock }]
-  const [clienteId, setClienteId] = useState('');
-  const [tipoPago, setTipoPago] = useState('efectivo');
-  const [descuento, setDescuento] = useState(0);
   const [emitido, setEmitido] = useState(null); // factura emitida (modal)
   const [guardando, setGuardando] = useState(false);
 
@@ -58,48 +63,6 @@ const Caja = () => {
     );
   }, [productos, termino]);
 
-  const agregar = (producto) => {
-    setCarrito((prev) => {
-      const existente = prev.find((i) => i.producto_id === producto.id);
-      if (existente) {
-        if (existente.cantidad >= producto.stock_actual) return prev;
-        return prev.map((i) =>
-          i.producto_id === producto.id ? { ...i, cantidad: i.cantidad + 1 } : i
-        );
-      }
-      if (producto.stock_actual <= 0) return prev;
-      return [...prev, {
-        producto_id: producto.id,
-        nombre: producto.nombre,
-        precio: Number(producto.precio_venta),
-        impuesto_porcentaje: Number(producto.impuesto_porcentaje || 0),
-        cantidad: 1,
-        stock: producto.stock_actual
-      }];
-    });
-  };
-
-  const cambiarCantidad = (id, cantidad) => {
-    const n = Math.max(0, Math.min(Number(cantidad) || 0, carrito.find((i) => i.producto_id === id)?.stock || 9999));
-    setCarrito((prev) =>
-      n === 0
-        ? prev.filter((i) => i.producto_id !== id)
-        : prev.map((i) => (i.producto_id === id ? { ...i, cantidad: n } : i))
-    );
-  };
-
-  const quitar = (id) => setCarrito((prev) => prev.filter((i) => i.producto_id !== id));
-
-  // Cálculo de totales.
-  const totales = useMemo(() => {
-    const subtotal = carrito.reduce((acc, i) => acc + i.precio * i.cantidad, 0);
-    const impuesto = carrito.reduce(
-      (acc, i) => acc + i.precio * i.cantidad * (i.impuesto_porcentaje / 100), 0
-    );
-    const desc = Math.max(0, Number(descuento) || 0);
-    return { subtotal, impuesto, descuento: desc, total: Math.max(0, subtotal + impuesto - desc) };
-  }, [carrito, descuento]);
-
   const emitir = async () => {
     setGuardando(true);
     setError('');
@@ -111,9 +74,7 @@ const Caja = () => {
         items: carrito.map((i) => ({ producto_id: i.producto_id, cantidad: i.cantidad }))
       });
       setEmitido(respuesta.data.datos);
-      setCarrito([]);
-      setClienteId('');
-      setDescuento(0);
+      vaciar();
       await cargarDatos();
     } catch (err) {
       setError(err.response?.data?.mensaje || 'Error al emitir la factura');
