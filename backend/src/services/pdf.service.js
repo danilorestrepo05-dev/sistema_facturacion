@@ -143,7 +143,7 @@ const generarFacturaPDF = (factura, { formato = 'carta' } = {}) =>
     const descAdicional = Math.max(0, Number(factura.descuento || 0) - descLineas);
 
     if (descLineas > 0 && descAdicional > 0) {
-      escribirTotal('Descuento líneas', `- ${formatearMoneda(descLineas)}`);
+      escribirTotal('Descuento productos', `- ${formatearMoneda(descLineas)}`);
       escribirTotal('Descuento adicional', `- ${formatearMoneda(descAdicional)}`);
     } else if (Number(factura.descuento) > 0) {
       escribirTotal('Descuento', `- ${formatearMoneda(factura.descuento)}`);

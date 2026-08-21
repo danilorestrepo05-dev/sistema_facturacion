@@ -282,7 +282,7 @@ const DesgloseDescuento = ({ factura }) => {
 
   return (
     <>
-      {descLineas > 0 && <div>Descuento líneas: - {formatoMoneda(descLineas)}</div>}
+      {descLineas > 0 && <div>Descuento productos: - {formatoMoneda(descLineas)}</div>}
       {descAdicional > 0 && <div>Descuento adicional: - {formatoMoneda(descAdicional)}</div>}
     </>
   );

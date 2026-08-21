@@ -84,7 +84,7 @@ const generarTicket = (factura, { ancho = '80' } = {}) => {
   const descAdicional = Math.max(0, Number(factura.descuento || 0) - descLineas);
 
   if (descLineas > 0 && descAdicional > 0) {
-    lineas.push(`Descuento líneas: - ${formatearMoneda(descLineas)}`);
+    lineas.push(`Descuento productos: - ${formatearMoneda(descLineas)}`);
     lineas.push(`Descuento adicional: - ${formatearMoneda(descAdicional)}`);
   } else if (Number(factura.descuento) > 0) {
     lineas.push(`Descuento: - ${formatearMoneda(factura.descuento)}`);
