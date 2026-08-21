@@ -293,6 +293,19 @@ async function main() {
   });
   ok('Descuento de línea negativo rechazado (400)', descNegativo.status === 400);
 
+  // Anti-regresión: línea ($500) + adicional ($300) se suman UNA sola vez.
+  // p1: 4000 - 500 = 3500 -> IVA 10% = 350; descuento total 800; total 3550.
+  const facturaAmbos = await peticion('POST', '/facturas', tokenCajero, {
+    descuento: 300,
+    items: [{ producto_id: idProducto1, cantidad: 1, descuento: 500 }]
+  });
+  ok('Descuentos de línea y adicional se suman una sola vez',
+    facturaAmbos.status === 201 &&
+    igual(Number(facturaAmbos.datos.datos.descuento), 800) &&
+    igual(Number(facturaAmbos.datos.datos.impuesto_total), 350) &&
+    igual(Number(facturaAmbos.datos.datos.total), 3550),
+    `desc=${facturaAmbos.datos.datos?.descuento} imp=${facturaAmbos.datos.datos?.impuesto_total} total=${facturaAmbos.datos.datos?.total}`);
+
   console.log('\n=== 6. Impresión: PDF y ticket POS ===');
 
   const pdfCarta = await peticion('GET', `/facturas/${idFactura}/pdf?formato=carta`, tokenAdmin);
@@ -372,10 +385,11 @@ async function main() {
 
   const stockRestaurado = await peticion('GET', `/productos/${idProducto1}`, tokenAdmin);
   const stockRestaurado2 = await peticion('GET', `/productos/${idProducto2}`, tokenAdmin);
-  // La factura anulada vendió 3 y 2 unidades; la factura de descuento por línea
-  // (que NO se anula) vendió 2 y 1. El stock queda en el inicial menos 2 y 1.
+  // La factura anulada vendió 3 y 2 unidades; las facturas de descuento por
+  // línea y de descuentos combinados (que NO se anulan) vendieron 2+1 y 1 del
+  // producto 1, y 1 del producto 2. El stock queda en el inicial menos 3 y 1.
   ok('Stock restaurado tras anulación',
-    igual(stockRestaurado.datos.datos.stock_actual, stockAntes1 - 2) && igual(stockRestaurado2.datos.datos.stock_actual, stockAntes2 - 1),
+    igual(stockRestaurado.datos.datos.stock_actual, stockAntes1 - 3) && igual(stockRestaurado2.datos.datos.stock_actual, stockAntes2 - 1),
     `${stockAntes1}/${stockRestaurado.datos.datos.stock_actual} y ${stockAntes2}/${stockRestaurado2.datos.datos.stock_actual}`);
 
   const repMovAnul = await peticion('GET', `/reportes/movimientos?${rango}&motivo=anulacion`, tokenAdmin);

@@ -70,7 +70,9 @@ const Caja = () => {
       const respuesta = await api.post('/facturas', {
         cliente_id: clienteId || null,
         tipo_pago: tipoPago,
-        descuento: totales.descuento,
+        // Solo el descuento adicional de factura: los descuentos de línea viajan
+        // dentro de cada item y el backend los suma una sola vez.
+        descuento: Math.max(0, Number(descuento) || 0),
         items: carrito.map((i) => ({
           producto_id: i.producto_id,
           cantidad: i.cantidad,
