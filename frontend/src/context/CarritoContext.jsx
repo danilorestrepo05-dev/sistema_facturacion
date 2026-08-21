@@ -89,12 +89,11 @@ export const CarritoProvider = ({ children }) => {
     );
   };
 
-  // Descuento por línea en $: nunca negativo ni mayor al valor de la línea.
+  // Descuento por línea en $: nunca negativo. El tope superior (valor de la
+  // línea) NO se aplica aquí para no pisar el valor mientras el usuario teclea;
+  // se normaliza al salir del campo (blur) y el backend lo valida al emitir.
   const cambiarDescuento = (id, valor) => {
-    const item = carrito.find((i) => i.producto_id === id);
-    if (!item) return;
-    const maximo = item.precio * item.cantidad;
-    const n = Math.max(0, Math.min(Number(valor) || 0, maximo));
+    const n = Math.max(0, Number(valor) || 0);
     setCarrito((prev) =>
       prev.map((i) => (i.producto_id === id ? { ...i, descuento: n } : i))
     );

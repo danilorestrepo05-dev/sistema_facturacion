@@ -177,12 +177,7 @@ const Caja = () => {
                         onChange={(e) => cambiarCantidad(item.producto_id, e.target.value)}
                       />
                       <span className="small text-secondary ms-2">Descuento $:</span>
-                      <Form.Control
-                        type="number" size="sm" min={0} step={50} style={{ width: 100 }}
-                        max={item.precio * item.cantidad}
-                        value={item.descuento ?? 0}
-                        onChange={(e) => cambiarDescuento(item.producto_id, e.target.value)}
-                      />
+                      <CampoDescuento item={item} onCambiar={cambiarDescuento} />
                     </div>
                   </ListGroup.Item>
                 ))}
@@ -262,5 +257,31 @@ const FilaTotal = ({ etiqueta, valor }) => (
     <span>{valor}</span>
   </div>
 );
+
+// Input de descuento por línea con borrador local: mientras el usuario teclea
+// el valor vive aquí (permite borrar y escribir sin que se reescriba un "0");
+// al salir del campo (blur) se normaliza entre 0 y el valor de la línea.
+const CampoDescuento = ({ item, onCambiar }) => {
+  const [texto, setTexto] = useState(String(item.descuento ?? 0));
+
+  const alSalir = () => {
+    const maximo = item.precio * item.cantidad;
+    const n = Math.max(0, Math.min(Number(texto) || 0, maximo));
+    setTexto(String(n));
+    onCambiar(item.producto_id, String(n));
+  };
+
+  return (
+    <Form.Control
+      type="number" size="sm" min={0} style={{ width: 100 }}
+      value={texto}
+      onChange={(e) => {
+        setTexto(e.target.value);
+        onCambiar(item.producto_id, e.target.value); // totales en vivo (sin tope superior)
+      }}
+      onBlur={alSalir}
+    />
+  );
+};
 
 export default Caja;
