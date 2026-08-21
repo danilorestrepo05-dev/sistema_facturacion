@@ -66,6 +66,9 @@ const generarTicket = (factura, { ancho = '80' } = {}) => {
     lineas.push(
       `    ${formatearMoneda(detalle.precio_unitario)} c/u  IVA ${detalle.impuesto_porcentaje}%`
     );
+    if (Number(detalle.descuento) > 0) {
+      lineas.push(`    Descuento: - ${formatearMoneda(detalle.descuento)}`);
+    }
     lineas.push(alinearDerecha(`Subtotal: ${formatearMoneda(detalle.subtotal)}`, chars));
     lineas.push(' '.repeat(chars));
   });

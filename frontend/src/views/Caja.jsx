@@ -18,7 +18,7 @@ const Caja = () => {
   const {
     carrito, clienteId, tipoPago, descuento, totales,
     setClienteId, setTipoPago, setDescuento,
-    agregar, cambiarCantidad, quitar, vaciar
+    agregar, cambiarCantidad, cambiarDescuento, quitar, vaciar
   } = useCarrito();
 
   const [productos, setProductos] = useState([]);
@@ -71,7 +71,11 @@ const Caja = () => {
         cliente_id: clienteId || null,
         tipo_pago: tipoPago,
         descuento: totales.descuento,
-        items: carrito.map((i) => ({ producto_id: i.producto_id, cantidad: i.cantidad }))
+        items: carrito.map((i) => ({
+          producto_id: i.producto_id,
+          cantidad: i.cantidad,
+          descuento: Number(i.descuento) || 0
+        }))
       });
       setEmitido(respuesta.data.datos);
       vaciar();
@@ -159,18 +163,25 @@ const Caja = () => {
                         </div>
                       </div>
                       <div className="d-flex align-items-center gap-2">
-                        <strong className="small">{formatoMoneda(item.precio * item.cantidad)}</strong>
+                        <strong className="small">{formatoMoneda(item.precio * item.cantidad - (Number(item.descuento) || 0))}</strong>
                         <Button size="sm" variant="outline-danger" onClick={() => quitar(item.producto_id)}>
                           <i className="bi bi-trash"></i>
                         </Button>
                       </div>
                     </div>
-                    <div className="d-flex align-items-center gap-2 mt-1">
+                    <div className="d-flex align-items-center gap-2 mt-1 flex-wrap">
                       <span className="small text-secondary">Cantidad:</span>
                       <Form.Control
                         type="number" size="sm" min={1} style={{ width: 90 }}
                         value={item.cantidad}
                         onChange={(e) => cambiarCantidad(item.producto_id, e.target.value)}
+                      />
+                      <span className="small text-secondary ms-2">Descuento $:</span>
+                      <Form.Control
+                        type="number" size="sm" min={0} step={50} style={{ width: 100 }}
+                        max={item.precio * item.cantidad}
+                        value={item.descuento ?? 0}
+                        onChange={(e) => cambiarDescuento(item.producto_id, e.target.value)}
                       />
                     </div>
                   </ListGroup.Item>
@@ -196,7 +207,7 @@ const Caja = () => {
               </Row>
 
               <InputGroup size="sm" className="mb-3">
-                <InputGroup.Text>Descuento $</InputGroup.Text>
+                <InputGroup.Text>Descuento adicional $</InputGroup.Text>
                 <Form.Control type="number" min={0} value={descuento}
                   onChange={(e) => setDescuento(e.target.value)} />
               </InputGroup>

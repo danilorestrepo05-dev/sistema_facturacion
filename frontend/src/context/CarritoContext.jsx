@@ -73,7 +73,8 @@ export const CarritoProvider = ({ children }) => {
         precio: Number(producto.precio_venta),
         impuesto_porcentaje: Number(producto.impuesto_porcentaje || 0),
         cantidad: 1,
-        stock: producto.stock_actual
+        stock: producto.stock_actual,
+        descuento: 0
       }];
     });
   };
@@ -88,6 +89,17 @@ export const CarritoProvider = ({ children }) => {
     );
   };
 
+  // Descuento por línea en $: nunca negativo ni mayor al valor de la línea.
+  const cambiarDescuento = (id, valor) => {
+    const item = carrito.find((i) => i.producto_id === id);
+    if (!item) return;
+    const maximo = item.precio * item.cantidad;
+    const n = Math.max(0, Math.min(Number(valor) || 0, maximo));
+    setCarrito((prev) =>
+      prev.map((i) => (i.producto_id === id ? { ...i, descuento: n } : i))
+    );
+  };
+
   const quitar = (id) => setCarrito((prev) => prev.filter((i) => i.producto_id !== id));
 
   // Descarta toda la venta (tras emitir la factura o al cerrar sesión).
@@ -99,20 +111,33 @@ export const CarritoProvider = ({ children }) => {
   };
 
   // Cálculo de totales de la venta en curso.
+  // El impuesto de cada línea se calcula sobre su base reducida
+  // (precio * cantidad - descuento de línea), igual que lo hace el backend.
   const totales = useMemo(() => {
-    const subtotal = carrito.reduce((acc, i) => acc + i.precio * i.cantidad, 0);
-    const impuesto = carrito.reduce(
-      (acc, i) => acc + i.precio * i.cantidad * (i.impuesto_porcentaje / 100), 0
-    );
-    const desc = Math.max(0, Number(descuento) || 0);
-    return { subtotal, impuesto, descuento: desc, total: Math.max(0, subtotal + impuesto - desc) };
+    let subtotal = 0;
+    let impuesto = 0;
+    let descuentoLineas = 0;
+    for (const i of carrito) {
+      const bruto = i.precio * i.cantidad;
+      const desc = Math.max(0, Math.min(Number(i.descuento) || 0, bruto));
+      subtotal += bruto;
+      descuentoLineas += desc;
+      impuesto += (bruto - desc) * (i.impuesto_porcentaje / 100);
+    }
+    const descFactura = Math.max(0, Number(descuento) || 0);
+    return {
+      subtotal,
+      impuesto,
+      descuento: descuentoLineas + descFactura,
+      total: Math.max(0, subtotal + impuesto - descuentoLineas - descFactura)
+    };
   }, [carrito, descuento]);
 
   return (
     <CarritoContext.Provider value={{
       carrito, clienteId, tipoPago, descuento, totales,
       setClienteId, setTipoPago, setDescuento,
-      agregar, cambiarCantidad, quitar, vaciar
+      agregar, cambiarCantidad, cambiarDescuento, quitar, vaciar
     }}>
       {children}
     </CarritoContext.Provider>

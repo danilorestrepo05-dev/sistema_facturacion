@@ -18,7 +18,31 @@ const server = spawn(process.execPath, ['src/server.js'], {
   stdio: ['ignore', 'pipe', 'pipe']
 });
 
+// Si el servidor muere al arrancar, muestra su error en vez de colgarse.
+// (Tras completar el arranque, el kill() final del test no debe alarmar.)
+let servidorListo = false;
+server.stderr.on('data', (d) => process.stderr.write(d));
+server.on('exit', (code) => {
+  if (!servidorListo && code !== null && code !== 0) {
+    console.error(`El servidor de prueba terminó con código ${code}`);
+    process.exit(1);
+  }
+});
+
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Espera a que el servidor responda /health (hasta 15 s), sondeando cada 250 ms.
+async function esperarServidor() {
+  const limite = Date.now() + 15000;
+  while (Date.now() < limite) {
+    try {
+      const r = await fetch(`${BASE}/health`);
+      if (r.ok) { servidorListo = true; return; }
+    } catch { /* aún no escucha, reintenta */ }
+    await espera(250);
+  }
+  throw new Error('El servidor de prueba no respondió a tiempo');
+}
 
 // Fecha local de hoy en YYYY-MM-DD (igual que usa el backend para los reportes).
 const hoyLocal = () => {
@@ -56,7 +80,7 @@ const ok = (nombre, condicion, extra = '') => {
 const igual = (esperado, real) => JSON.stringify(esperado) === JSON.stringify(real);
 
 async function main() {
-  await espera(1500);
+  await esperarServidor();
 
   console.log('\n=== 1. Salud y autenticación ===');
 
@@ -238,6 +262,37 @@ async function main() {
   const listaFacturas = await peticion('GET', `/facturas?estado=emitida&cliente=${encodeURIComponent(`Cliente Test ${sufijo}`)}`, tokenAdmin);
   ok('Listar facturas filtradas', listaFacturas.datos.datos.some((x) => x.id === idFactura));
 
+  // --- Descuento por línea (monto $, tope = valor de la línea) ---
+  // p1: 2*4000=8000 con descuento 1000 -> base 7000, impuesto 10% = 700.
+  // p2: 1*2500=2500 sin descuento -> impuesto 10% = 250.
+  // subtotal=10500, descuentoLineas=1000, impuestoTotal=950, total=10450.
+  const facturaDescLinea = await peticion('POST', '/facturas', tokenCajero, {
+    items: [
+      { producto_id: idProducto1, cantidad: 2, descuento: 1000 },
+      { producto_id: idProducto2, cantidad: 1 }
+    ]
+  });
+  ok('Crear factura con descuento por línea', facturaDescLinea.status === 201);
+  const fd = facturaDescLinea.datos.datos;
+  ok('Totales con descuento por línea',
+    igual(Number(fd.subtotal), 10500) && igual(Number(fd.descuento), 1000) &&
+    igual(Number(fd.impuesto_total), 950) && igual(Number(fd.total), 10450),
+    `subtotal=${fd.subtotal} desc=${fd.descuento} imp=${fd.impuesto_total} total=${fd.total}`);
+  ok('Línea guarda descuento e impuesto sobre base reducida',
+    igual(Number(fd.detalles[0].descuento), 1000) && igual(Number(fd.detalles[0].impuesto), 700),
+    `desc=${fd.detalles[0].descuento} imp=${fd.detalles[0].impuesto}`);
+
+  const descExcesivo = await peticion('POST', '/facturas', tokenCajero, {
+    items: [{ producto_id: idProducto1, cantidad: 1, descuento: 99999 }]
+  });
+  ok('Descuento de línea mayor al valor rechazado (400)', descExcesivo.status === 400,
+    descExcesivo.datos?.mensaje || '');
+
+  const descNegativo = await peticion('POST', '/facturas', tokenCajero, {
+    items: [{ producto_id: idProducto1, cantidad: 1, descuento: -500 }]
+  });
+  ok('Descuento de línea negativo rechazado (400)', descNegativo.status === 400);
+
   console.log('\n=== 6. Impresión: PDF y ticket POS ===');
 
   const pdfCarta = await peticion('GET', `/facturas/${idFactura}/pdf?formato=carta`, tokenAdmin);
@@ -317,8 +372,10 @@ async function main() {
 
   const stockRestaurado = await peticion('GET', `/productos/${idProducto1}`, tokenAdmin);
   const stockRestaurado2 = await peticion('GET', `/productos/${idProducto2}`, tokenAdmin);
+  // La factura anulada vendió 3 y 2 unidades; la factura de descuento por línea
+  // (que NO se anula) vendió 2 y 1. El stock queda en el inicial menos 2 y 1.
   ok('Stock restaurado tras anulación',
-    igual(stockRestaurado.datos.datos.stock_actual, stockAntes1) && igual(stockRestaurado2.datos.datos.stock_actual, stockAntes2),
+    igual(stockRestaurado.datos.datos.stock_actual, stockAntes1 - 2) && igual(stockRestaurado2.datos.datos.stock_actual, stockAntes2 - 1),
     `${stockAntes1}/${stockRestaurado.datos.datos.stock_actual} y ${stockAntes2}/${stockRestaurado2.datos.datos.stock_actual}`);
 
   const repMovAnul = await peticion('GET', `/reportes/movimientos?${rango}&motivo=anulacion`, tokenAdmin);

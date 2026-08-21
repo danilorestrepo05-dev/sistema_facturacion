@@ -62,7 +62,7 @@ const buscarPorId = async (id) => {
   if (!factura[0]) return null;
 
   const [detalles] = await pool.query(
-    `SELECT id, producto_id, producto_nombre, cantidad, precio_unitario,
+    `SELECT id, producto_id, producto_nombre, cantidad, precio_unitario, descuento,
             impuesto_porcentaje, impuesto, subtotal
      FROM detalles_factura WHERE factura_id = ? ORDER BY id`,
     [id]
@@ -73,7 +73,9 @@ const buscarPorId = async (id) => {
 
 // Crea una factura dentro de una transacción:
 // valida stock, calcula totales, descuenta inventario y registra los movimientos.
-// datos: { cliente_id, tipo_pago, descuento, items: [{ producto_id, cantidad }] }
+// datos: { cliente_id, tipo_pago, descuento, items: [{ producto_id, cantidad, descuento? }] }
+// El descuento por línea es un monto en $ con tope al valor de la línea
+// (precio * cantidad); el impuesto de cada línea se calcula sobre la base reducida.
 const crear = async (datos, usuarioId) => {
   const { cliente_id = null, tipo_pago = 'efectivo', descuento = 0, items } = datos;
 
@@ -100,6 +102,7 @@ const crear = async (datos, usuarioId) => {
 
     let subtotal = 0;
     let impuestoTotal = 0;
+    let descuentoLineas = 0;
 
     // Valida cada línea, calcula precios e impuestos y descuenta el stock.
     const lineas = [];
@@ -124,19 +127,32 @@ const crear = async (datos, usuarioId) => {
 
       const porcentaje = Number(producto.impuesto_porcentaje || 0);
       const importeBase = Number(producto.precio_venta) * item.cantidad;
-      const impuestoLinea = importeBase * (porcentaje / 100);
+
+      // Descuento de la línea: monto en $, no puede superar el valor de la línea.
+      const descuentoLinea = Number(item.descuento || 0);
+      if (descuentoLinea > importeBase) {
+        throw Object.assign(
+          new Error(`El descuento de "${producto.nombre}" ($ ${descuentoLinea}) supera el valor de la línea ($ ${importeBase})`),
+          { status: 400 }
+        );
+      }
+
+      // El impuesto se calcula sobre la base reducida (DIAN-friendly).
+      const impuestoLinea = (importeBase - descuentoLinea) * (porcentaje / 100);
 
       lineas.push({
         producto_id: producto.id,
         producto_nombre: producto.nombre,
         cantidad: item.cantidad,
         precio_unitario: producto.precio_venta,
+        descuento: descuentoLinea,
         impuesto_porcentaje: porcentaje,
         impuesto: impuestoLinea,
         subtotal_linea: importeBase
       });
 
       subtotal += importeBase;
+      descuentoLineas += descuentoLinea;
       impuestoTotal += impuestoLinea;
 
       await conexion.query(
@@ -146,13 +162,15 @@ const crear = async (datos, usuarioId) => {
     }
 
     const descuentoNum = Number(descuento || 0);
-    const total = Math.max(0, subtotal + impuestoTotal - descuentoNum);
+    // El descuento total de la factura suma los descuentos de línea y el de factura.
+    const descuentoTotal = descuentoLineas + descuentoNum;
+    const total = Math.max(0, subtotal + impuestoTotal - descuentoTotal);
 
     // Inserta la factura.
     const [factura] = await conexion.query(
       `INSERT INTO facturas (numero_factura, cliente_id, usuario_id, tipo_pago, subtotal, impuesto_total, descuento, total)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [numeroFactura, cliente_id, usuarioId, tipo_pago, subtotal, impuestoTotal, descuentoNum, total]
+      [numeroFactura, cliente_id, usuarioId, tipo_pago, subtotal, impuestoTotal, descuentoTotal, total]
     );
 
     const facturaId = factura.insertId;
@@ -161,11 +179,12 @@ const crear = async (datos, usuarioId) => {
     for (const linea of lineas) {
       await conexion.query(
         `INSERT INTO detalles_factura
-           (factura_id, producto_id, producto_nombre, cantidad, precio_unitario,
+           (factura_id, producto_id, producto_nombre, cantidad, precio_unitario, descuento,
             impuesto_porcentaje, impuesto, subtotal)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [facturaId, linea.producto_id, linea.producto_nombre, linea.cantidad,
-         linea.precio_unitario, linea.impuesto_porcentaje, linea.impuesto, linea.subtotal_linea]
+         linea.precio_unitario, linea.descuento, linea.impuesto_porcentaje,
+         linea.impuesto, linea.subtotal_linea]
       );
 
       await conexion.query(

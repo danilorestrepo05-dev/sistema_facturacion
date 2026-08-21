@@ -39,7 +39,7 @@ const obtener = async (req, res, next) => {
 };
 
 // POST /api/v1/facturas
-// Body: { cliente_id?, tipo_pago?, descuento?, items: [{ producto_id, cantidad }] }
+// Body: { cliente_id?, tipo_pago?, descuento?, items: [{ producto_id, cantidad, descuento? }] }
 const crear = async (req, res, next) => {
   try {
     const { cliente_id, tipo_pago, descuento, items } = req.body || {};
@@ -140,6 +140,11 @@ function validarCreacion(datos) {
     }
     if (!item.cantidad || !Number.isInteger(Number(item.cantidad)) || Number(item.cantidad) <= 0) {
       return 'Cada item debe incluir una cantidad entera mayor a 0';
+    }
+    // Descuento por línea opcional: monto en $ mayor o igual a 0.
+    if (item.descuento !== undefined && item.descuento !== null &&
+        (Number.isNaN(Number(item.descuento)) || Number(item.descuento) < 0)) {
+      return 'El descuento de cada item debe ser un número mayor o igual a 0';
     }
   }
 
