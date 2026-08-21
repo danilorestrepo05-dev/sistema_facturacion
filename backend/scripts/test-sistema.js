@@ -1,7 +1,8 @@
 // scripts/test-sistema.js
-// Smoke test integral del sistema (v0.9.5).
+// Smoke test integral del sistema (v0.9.12).
 // Recorre el flujo completo: login, roles, catálogo, clientes, proveedores,
-// facturación (PDF + ticket POS), reportes, movimientos, anulación y backup.
+// facturación (PDF + ticket POS), reportes, movimientos, backup, configuración,
+// anulación y limpieza.
 // Uso: node scripts/test-sistema.js
 const { spawn } = require('child_process');
 const path = require('path');
@@ -282,7 +283,31 @@ async function main() {
   ok('Backup descargado', backup.status === 200 && typeof backup.datos === 'string' && backup.datos.length > 100 && backup.datos.includes('CREATE TABLE'),
     `${backup.datos.length} bytes`);
 
-  console.log('\n=== 9. Anulación y consistencia ===');
+  console.log('\n=== 9. Configuración del sistema ===');
+
+  const configSinToken = await peticion('GET', '/configuracion', null);
+  ok('Configuración sin token rechazada (401)', configSinToken.status === 401);
+
+  const configCajero = await peticion('GET', '/configuracion', tokenCajero);
+  ok('Cajero puede leer configuración',
+    configCajero.status === 200 && Array.isArray(configCajero.datos.datos) &&
+    configCajero.datos.datos.some((c) => c.clave === 'codigo_barras_habilitado'));
+
+  const configPutCajero = await peticion('PUT', '/configuracion', tokenCajero, { clave: 'codigo_barras_habilitado', valor: '1' });
+  ok('Cajero NO puede cambiar configuración (403)', configPutCajero.status === 403);
+
+  const configPutInvalida = await peticion('PUT', '/configuracion', tokenAdmin, { clave: 'clave_inexistente', valor: '1' });
+  ok('Actualizar clave inexistente rechazado (404)', configPutInvalida.status === 404);
+
+  const configActivar = await peticion('PUT', '/configuracion', tokenAdmin, { clave: 'codigo_barras_habilitado', valor: '1' });
+  ok('Admin activa flag de código de barras',
+    configActivar.status === 200 && configActivar.datos.datos.some((c) => c.clave === 'codigo_barras_habilitado' && c.valor === '1'));
+
+  const configRestaurar = await peticion('PUT', '/configuracion', tokenAdmin, { clave: 'codigo_barras_habilitado', valor: '0' });
+  ok('Admin restaura flag a desactivado',
+    configRestaurar.status === 200 && configRestaurar.datos.datos.some((c) => c.clave === 'codigo_barras_habilitado' && c.valor === '0'));
+
+  console.log('\n=== 10. Anulación y consistencia ===');
 
   const anularCajero = await peticion('POST', `/facturas/${idFactura}/anular`, tokenCajero);
   ok('Cajero NO puede anular factura (403)', anularCajero.status === 403);
@@ -302,7 +327,7 @@ async function main() {
   const dobleAnulacion = await peticion('POST', `/facturas/${idFactura}/anular`, tokenAdmin);
   ok('Anular factura ya anulada rechazado (409)', dobleAnulacion.status === 409);
 
-  console.log('\n=== 10. Limpieza ===');
+  console.log('\n=== 11. Limpieza ===');
 
   await peticion('DELETE', `/productos/${idProducto2}`, tokenAdmin);
   await peticion('DELETE', `/productos/${idProducto1}`, tokenAdmin);

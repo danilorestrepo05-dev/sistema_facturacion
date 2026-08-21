@@ -1,6 +1,6 @@
 # Sistema de Facturación e Inventario
 
-> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.11. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
+> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.12. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
 
 Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Monorepo Full-Stack JS). Diseñado de forma genérica para que pueda adaptarse a otros modelos de negocio (café, peluquería, tienda, etc.) cambiando únicamente registros de la base de datos y variables de entorno.
 
@@ -9,8 +9,9 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 - **Backend:** Node.js + Express 5 (`backend/`).
 - **Frontend:** React + Vite + Bootstrap 5 (`frontend/`, en desarrollo).
 
-## Estado actual (v0.9.11)
-- Base de datos `sistema_facturacion` con tablas `usuarios`, `impuestos`, `categorias`, `productos`, `clientes`, `proveedores`, `facturas`, `detalles_factura` y `movimientos_inventario`.
+## Estado actual (v0.9.12)
+- Base de datos `sistema_facturacion` con tablas `usuarios`, `impuestos`, `categorias`, `productos`, `clientes`, `proveedores`, `facturas`, `detalles_factura`, `movimientos_inventario` y `configuraciones`.
+- **Módulo de configuraciones**: flags por instalación (códigos de barras, gaveta de dinero, arqueo de caja, visador) que activan o desactivan funciones opcionales en toda la interfaz; pantalla de administración exclusiva del admin (`/configuracion`).
 - Backend con autenticación JWT + bcrypt.
 - **Roles `admin` y `cajero`**: toda escritura (catálogo, contactos, usuarios, anulación de factura, backup) exige rol administrador en el backend (403). En el frontend, las rutas de administración (`/usuarios`) están protegidas por un guard por rol (`RutaAdmin`): un cajero no puede acceder por URL.
 - **Flag activo/inactivo funcional en todos los módulos**: los registros inactivos no se ofrecen en los flujos operativos (un producto inactivo no se vende, un cliente inactivo no se selecciona en Caja, los selects de categoría e impuesto solo muestran activos); los listados de gestión los siguen mostrando para poder reactivarlos.
@@ -64,6 +65,8 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 | GET | `/api/v1/reportes/ventas/diarias?fecha_desde&fecha_hasta` | Ventas emitidas agrupadas por día | Token JWT |
 | GET | `/api/v1/reportes/inventario` | Reporte de inventario (bajo stock, categorías) | Token JWT |
 | GET | `/api/v1/reportes/movimientos?fecha_desde&fecha_hasta&tipo&motivo` | Movimientos de inventario (resumen y detalle) | Token JWT |
+| GET | `/api/v1/configuracion` | Flags de configuración del sistema (funciones opcionales) | Token JWT |
+| PUT | `/api/v1/configuracion` | Actualizar un flag (`{clave, valor}`) | Token JWT (admin) |
 
 ## Cómo ejecutar el frontend
 

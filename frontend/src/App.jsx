@@ -14,6 +14,7 @@ import Clientes from './views/Clientes';
 import Proveedores from './views/Proveedores';
 import Reportes from './views/Reportes';
 import Usuarios from './views/Usuarios';
+import Configuracion from './views/Configuracion';
 
 const App = () => (
   <BrowserRouter>
@@ -42,6 +43,14 @@ const App = () => (
           element={
             <RutaAdmin>
               <Usuarios />
+            </RutaAdmin>
+          }
+        />
+        <Route
+          path="configuracion"
+          element={
+            <RutaAdmin>
+              <Configuracion />
             </RutaAdmin>
           }
         />

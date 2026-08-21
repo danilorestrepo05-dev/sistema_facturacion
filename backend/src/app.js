@@ -12,6 +12,7 @@ const proveedorRoutes = require('./routes/proveedor.routes');
 const facturaRoutes = require('./routes/factura.routes');
 const reporteRoutes = require('./routes/reporte.routes');
 const backupRoutes = require('./routes/backup.routes');
+const configRoutes = require('./routes/config.routes');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -50,6 +51,9 @@ app.use('/api/v1/reportes', reporteRoutes);
 
 // Rutas de backup (solo admin).
 app.use('/api/v1/backup', backupRoutes);
+
+// Rutas de configuración del sistema (lectura: autenticados; escritura: admin).
+app.use('/api/v1/configuracion', configRoutes);
 
 // Ruta raíz informativa.
 app.get('/', (req, res) =>

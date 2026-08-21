@@ -44,6 +44,16 @@ const Navegacion = ({ esAdmin, onNavegar }) => (
         Usuarios
       </NavLink>
     )}
+    {esAdmin && (
+      <NavLink
+        to="/configuracion"
+        onClick={onNavegar}
+        className={({ isActive }) => `nav-link ${isActive ? 'activo' : ''}`}
+      >
+        <i className="bi bi-sliders"></i>
+        Configuración
+      </NavLink>
+    )}
   </nav>
 );
 
