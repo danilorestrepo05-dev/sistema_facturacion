@@ -25,9 +25,10 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 
 ## Cómo ejecutar el backend
 
-1. Encender MariaDB (XAMPP) y ejecutar el esquema:
+1. Encender MariaDB (XAMPP) y ejecutar el esquema. Usa redirección de `cmd` con
+   charset utf8mb4: la tubería de PowerShell re-encoda en ASCII y corrompe las tildes:
    ```powershell
-   Get-Content backend\sql\01_schema.sql -Raw | & C:\xampp\mysql\bin\mysql.exe -u root
+   cmd /c "C:\xampp\mysql\bin\mysql.exe -u root --default-character-set=utf8mb4 < backend\sql\01_schema.sql"
    ```
 2. Instalar dependencias (pnpm v11, activado vía corepack):
    ```powershell

@@ -1,7 +1,9 @@
 -- 08_configuraciones.sql
 -- Crea la tabla de configuraciones del sistema: flags de funciones opcionales
 -- (códigos de barras, gaveta, arqueo, visador) que cada instalación activa o no.
--- Uso: C:\xampp\mysql\bin\mysql.exe -u root < 08_configuraciones.sql
+-- IMPORTANTE: ejecutar con charset utf8mb4 y redirección de cmd (no tubería de
+-- PowerShell, que re-encoda en ASCII y corrompe tildes con '??'):
+--   cmd /c "C:\xampp\mysql\bin\mysql.exe -u root --default-character-set=utf8mb4 < backend\sql\08_configuraciones.sql"
 
 USE sistema_facturacion;
 
@@ -14,11 +16,12 @@ CREATE TABLE IF NOT EXISTS configuraciones (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 -- Flags de funciones opcionales. Todas inician en '0' (desactivadas) para no
--- alterar instalaciones existentes. ON DUPLICATE KEY evita sobrescribir valores
--- ya cambiados por el administrador si el script se ejecuta de nuevo.
+-- alterar instalaciones existentes. Al re-ejecutar se conserva el `valor` ya
+-- cambiado por el administrador, pero la `descripcion` se refresca (permite
+-- reparar textos dañados por problemas de encoding).
 INSERT INTO configuraciones (clave, valor, descripcion) VALUES
   ('codigo_barras_habilitado', '0', 'Habilita códigos de barras en productos y escáner en Caja'),
   ('gaveta_habilitada', '0', 'Habilita la apertura de la gaveta de dinero (requiere impresora térmica)'),
   ('arqueo_habilitado', '0', 'Habilita turnos de caja y control de efectivo (arqueo)'),
   ('visador_habilitado', '0', 'Habilita el visador (pantalla para el cliente)')
-ON DUPLICATE KEY UPDATE clave = clave;
+ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion);
