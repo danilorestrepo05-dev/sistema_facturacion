@@ -152,10 +152,25 @@ async function main() {
 
   const producto2 = await peticion('POST', '/productos', tokenAdmin, {
     codigo: `P-${sufijo}-2`, nombre: `Pasilla Test ${sufijo}`, categoria_id: idCategoria,
-    impuesto_id: idImpuesto, precio_compra: 1000, precio_venta: 2500, stock_actual: 10, stock_minimo: 2, activo: 1
+    impuesto_id: idImpuesto, precio_compra: 1000, precio_venta: 2500, stock_actual: 10,
+    stock_minimo: 2, activo: 1, codigo_barras: `EAN-${sufijo}`
   });
-  ok('Crear producto 2', producto2.status === 201);
+  ok('Crear producto 2 (con código de barras)', producto2.status === 201);
   const idProducto2 = producto2.datos.datos.id;
+
+  // Escáner en Caja (v0.9.20): lookup por código de barras.
+  const lookupBarras = await peticion('GET', `/productos/codigo-barras/EAN-${sufijo}`, tokenCajero);
+  ok('Lookup por código de barras devuelve el producto',
+    lookupBarras.status === 200 && lookupBarras.datos.datos.id === idProducto2);
+
+  const barrasDesconocido = await peticion('GET', `/productos/codigo-barras/NOEXISTE-${sufijo}`, tokenCajero);
+  ok('Código de barras inexistente rechazado (404)', barrasDesconocido.status === 404);
+
+  const barrasDuplicado = await peticion('POST', '/productos', tokenAdmin, {
+    codigo: `P-${sufijo}-dupbar`, nombre: `Duplico Barras ${sufijo}`,
+    precio_venta: 100, codigo_barras: `EAN-${sufijo}`
+  });
+  ok('Código de barras duplicado rechazado (409)', barrasDuplicado.status === 409);
 
   const auto = await peticion('POST', '/productos', tokenAdmin, { nombre: `AutoCodigo ${sufijo}`, precio_venta: 1200 });
   ok('Producto sin código se autogenera (PRO-xxx)', auto.status === 201 && /^PRO-\d+$/.test(auto.datos.datos.codigo),
@@ -168,6 +183,7 @@ async function main() {
   // Producto inactivo no se ofrece en venta (v0.9.11).
   const cuerpoProducto1 = {
     codigo: producto1.datos.datos.codigo,
+    codigo_barras: producto1.datos.datos.codigo_barras,
     nombre: producto1.datos.datos.nombre,
     descripcion: producto1.datos.datos.descripcion,
     categoria_id: producto1.datos.datos.categoria_id,

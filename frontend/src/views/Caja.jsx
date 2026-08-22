@@ -1,6 +1,6 @@
 // src/views/Caja.jsx
 // Punto de venta: busca productos, arma la venta y emite la factura.
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Row, Col, Card, Form, Button, InputGroup, ListGroup, Badge,
   Spinner, Alert, Modal
@@ -8,6 +8,7 @@ import {
 import api from '../services/api';
 import { abrirTicketFactura, abrirPdfFactura } from '../services/impresion';
 import { useCarrito } from '../context/CarritoContext';
+import { useConfig } from '../context/ConfigContext';
 import { formatoMoneda } from '../utils/format';
 
 const TIPOS_PAGO = ['efectivo', 'tarjeta', 'transferencia', 'otro'];
@@ -21,6 +22,10 @@ const Caja = () => {
     agregar, cambiarCantidad, cambiarDescuento, quitar, vaciar
   } = useCarrito();
 
+  // El escáner de códigos de barras solo se muestra si el flag está activo.
+  const { estaHabilitado } = useConfig();
+  const escaneoActivo = estaHabilitado('codigo_barras_habilitado');
+
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -29,6 +34,13 @@ const Caja = () => {
   const [termino, setTermino] = useState('');
   const [emitido, setEmitido] = useState(null); // factura emitida (modal)
   const [guardando, setGuardando] = useState(false);
+
+  // Escáner de códigos de barras (pistola USB o cámara).
+  const inputEscaneoRef = useRef(null);
+  const videoRef = useRef(null);
+  const [codigoEscaneado, setCodigoEscaneado] = useState('');
+  const [avisoEscaneo, setAvisoEscaneo] = useState('');
+  const [camaraAbierta, setCamaraAbierta] = useState(false);
 
   useEffect(() => {
     cargarDatos();
@@ -62,6 +74,60 @@ const Caja = () => {
          (p.categoria_nombre || '').toLowerCase().includes(t))
     );
   }, [productos, termino]);
+
+  // Busca el producto por código de barras y lo agrega a la venta.
+  const procesarCodigo = async (valor) => {
+    const codigo = String(valor || '').trim();
+    if (!codigo) return;
+    setAvisoEscaneo('');
+    try {
+      const respuesta = await api.get(`/productos/codigo-barras/${encodeURIComponent(codigo)}`);
+      agregar(respuesta.data.datos);
+      setCodigoEscaneado('');
+      inputEscaneoRef.current?.focus(); // listo para el siguiente escaneo
+    } catch (err) {
+      setAvisoEscaneo(err.response?.data?.mensaje || 'Error al buscar el código de barras');
+      setCodigoEscaneado('');
+    }
+  };
+
+  // La pistola USB escribe el código y envía Enter, como un teclado.
+  const teclaEscaneo = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      procesarCodigo(codigoEscaneado);
+    }
+  };
+
+  // Cámara: abre el lector de ZXing sobre el video del modal (importación
+  // perezosa, solo se carga si se usa). Se detiene tras el primer código leído.
+  useEffect(() => {
+    if (!camaraAbierta) return;
+    let cancelado = false;
+    let controles = null;
+
+    (async () => {
+      try {
+        const { BrowserMultiFormatReader } = await import('@zxing/browser');
+        const lector = new BrowserMultiFormatReader();
+        controles = await lector.decodeFromVideoDevice(undefined, videoRef.current, (resultado, err, ctrl) => {
+          if (resultado && !cancelado) {
+            procesarCodigo(resultado.getText());
+            setCamaraAbierta(false);
+            ctrl?.stop();
+          }
+        });
+      } catch {
+        setAvisoEscaneo('No se pudo abrir la cámara. Recuerda que exige HTTPS o localhost.');
+        setCamaraAbierta(false);
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+      try { controles?.stop(); } catch { /* ya detenido */ }
+    };
+  }, [camaraAbierta]);
 
   const emitir = async () => {
     setGuardando(true);
@@ -110,8 +176,33 @@ const Caja = () => {
       {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
 
       <Row className="g-3">
-        {/* Columna izquierda: búsqueda y productos */}
+        {/* Columna izquierda: escáner, búsqueda y productos */}
         <Col lg={7}>
+          {escaneoActivo && (
+            <>
+              <InputGroup className="pos-busqueda mb-2">
+                <InputGroup.Text><i className="bi bi-upc-scan"></i></InputGroup.Text>
+                <Form.Control
+                  ref={inputEscaneoRef}
+                  placeholder="Escanear código de barras…"
+                  value={codigoEscaneado}
+                  onChange={(e) => setCodigoEscaneado(e.target.value)}
+                  onKeyDown={teclaEscaneo}
+                />
+                <Button variant="outline-primary" title="Escanear con la cámara"
+                  onClick={() => setCamaraAbierta(true)}>
+                  <i className="bi bi-camera"></i>
+                </Button>
+              </InputGroup>
+              {avisoEscaneo && (
+                <Alert variant="warning" className="py-2 small"
+                  dismissible onClose={() => setAvisoEscaneo('')}>
+                  {avisoEscaneo}
+                </Alert>
+              )}
+            </>
+          )}
+
           <InputGroup className="pos-busqueda mb-3">
             <Form.Control
               placeholder="Buscar por código, nombre o categoría…"
@@ -250,6 +341,16 @@ const Caja = () => {
           </Button>
           <Button variant="success" onClick={() => setEmitido(null)}>Nueva venta</Button>
         </Modal.Footer>
+      </Modal>
+
+      {/* Modal de escaneo con cámara (solo si el flag de códigos está activo) */}
+      <Modal show={camaraAbierta} onHide={() => setCamaraAbierta(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="fs-6">Apunta la cámara al código de barras</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-0">
+          <video ref={videoRef} style={{ width: '100%', display: 'block', borderRadius: '0 0 6px 6px' }} muted />
+        </Modal.Body>
       </Modal>
     </div>
   );

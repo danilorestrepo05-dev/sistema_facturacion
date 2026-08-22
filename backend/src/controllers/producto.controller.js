@@ -39,6 +39,26 @@ const obtener = async (req, res, next) => {
   }
 };
 
+// GET /api/v1/productos/codigo-barras/:codigo
+// Lookup para el escáner en Caja: devuelve el producto ACTIVO con ese código.
+const buscarPorCodigoBarras = async (req, res, next) => {
+  try {
+    const codigo = String(req.params.codigo || '').trim();
+    if (!codigo) {
+      return jsonError(res, 'Debe indicar un código de barras', 400);
+    }
+
+    const producto = await productoModel.buscarPorCodigoBarras(codigo);
+    if (!producto) {
+      return jsonError(res, 'No hay un producto activo con ese código de barras', 404);
+    }
+
+    return jsonExito(res, producto, 'Producto encontrado');
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // POST /api/v1/productos
 const crear = async (req, res, next) => {
   try {
@@ -58,7 +78,7 @@ const crear = async (req, res, next) => {
     return jsonExito(res, producto, 'Producto creado', 201);
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
-      return jsonError(res, 'Ya existe un producto con ese código', 409);
+      return jsonError(res, mensajeDuplicado(err), 409);
     }
     return next(err);
   }
@@ -83,7 +103,7 @@ const actualizar = async (req, res, next) => {
     return jsonExito(res, producto, 'Producto actualizado');
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
-      return jsonError(res, 'Ya existe un producto con ese código', 409);
+      return jsonError(res, mensajeDuplicado(err), 409);
     }
     return next(err);
   }
@@ -115,13 +135,26 @@ function validarProducto(datos) {
   if (datos.precio_venta === undefined || Number.isNaN(Number(datos.precio_venta))) {
     return 'El precio de venta es obligatorio y numérico';
   }
+  if (datos.codigo_barras && String(datos.codigo_barras).trim().length > 50) {
+    return 'El código de barras no puede superar 50 caracteres';
+  }
   return null;
+}
+
+// Mensaje claro según la clave única que falló (código interno o código de barras).
+function mensajeDuplicado(err) {
+  if (String(err.message || '').includes('codigo_barras')) {
+    return 'Ya existe un producto con ese código de barras';
+  }
+  return 'Ya existe un producto con ese código';
 }
 
 // Normaliza tipos y valores por defecto antes de guardar.
 function normalizar(datos) {
   return {
     codigo: String(datos.codigo).trim(),
+    // Código de barras opcional: cadena vacía se guarda como NULL.
+    codigo_barras: datos.codigo_barras ? String(datos.codigo_barras).trim() : null,
     nombre: String(datos.nombre).trim(),
     descripcion: datos.descripcion || null,
     categoria_id: datos.categoria_id || null,
@@ -135,4 +168,4 @@ function normalizar(datos) {
   };
 }
 
-module.exports = { listar, siguienteCodigo, obtener, crear, actualizar, eliminar };
+module.exports = { listar, siguienteCodigo, buscarPorCodigoBarras, obtener, crear, actualizar, eliminar };

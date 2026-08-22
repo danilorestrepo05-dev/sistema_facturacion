@@ -1,6 +1,6 @@
 # Sistema de Facturación e Inventario
 
-> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.19. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
+> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.20. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
 
 Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Monorepo Full-Stack JS). Diseñado de forma genérica para que pueda adaptarse a otros modelos de negocio (café, peluquería, tienda, etc.) cambiando únicamente registros de la base de datos y variables de entorno.
 
@@ -54,6 +54,7 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 | GET    | `/api/v1/auth/perfil`| Perfil del usuario autenticado     | Token JWT (Bearer) |
 | GET/POST | `/api/v1/categorias`, `/api/v1/impuestos`, `/api/v1/productos` | Catálogo (listar/crear) | Token JWT |
 | GET | `/api/v1/productos/siguiente-codigo` | Código correlativo sugerido para un producto nuevo | Token JWT |
+| GET | `/api/v1/productos/codigo-barras/:codigo` | Lookup por código de barras (escáner en Caja) | Token JWT |
 | GET/PUT/DELETE | `/api/v1/categorias/:id`, `/api/v1/impuestos/:id`, `/api/v1/productos/:id` | Catálogo (ver/editar/eliminar) | Token JWT (PUT/DELETE: admin) |
 | GET/POST | `/api/v1/clientes`, `/api/v1/proveedores` | Contactos (listar/crear) | Token JWT |
 | GET/PUT/DELETE | `/api/v1/clientes/:id`, `/api/v1/proveedores/:id` | Contactos (ver/editar/eliminar) | Token JWT (PUT/DELETE: admin) |
@@ -84,6 +85,12 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 3. Abrir `http://localhost:5173` e iniciar sesión con las credenciales del backend (p. ej. `admin` / `admin123`).
 
 > Nota: el backend debe estar corriendo para el inicio de sesión y las operaciones. Para producción se puede compilar con `pnpm run build` (genera `dist/`).
+
+## Códigos de barras y escáner (opcional)
+1. Aplicar la migración `backend/sql/10_codigo_barras.sql` (agrega `productos.codigo_barras`, único).
+2. En **Configuración** (admin), activar el flag **Códigos de barras**: aparece la barra de escaneo en Caja.
+3. Asignar el código del fabricante a cada producto desde el formulario de Productos (campo opcional).
+4. Escanear en Caja con pistola USB (modo teclado: lee código + Enter) o con la cámara del botón 📷 (el navegador exige `localhost` o HTTPS).
 
 ## Gestión de dependencias
 - El proyecto usa **pnpm v11** (ver `packageManager` en cada `package.json`; instala con `corepack enable pnpm`).

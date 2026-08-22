@@ -10,6 +10,8 @@ const router = Router();
 // Lectura: cualquier usuario autenticado.
 router.get('/', verificarToken, productoController.listar);
 router.get('/siguiente-codigo', verificarToken, productoController.siguienteCodigo);
+// Lookup por código de barras (escáner en Caja); debe ir antes de /:id.
+router.get('/codigo-barras/:codigo', verificarToken, productoController.buscarPorCodigoBarras);
 router.get('/:id', verificarToken, productoController.obtener);
 
 // Escritura: solo administrador.

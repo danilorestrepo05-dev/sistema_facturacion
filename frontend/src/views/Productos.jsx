@@ -95,7 +95,8 @@ const Productos = () => {
   const abrirEditar = (p) => {
     setEditando(p);
     setForm({
-      codigo: p.codigo, nombre: p.nombre, descripcion: p.descripcion || '',
+      codigo: p.codigo, codigo_barras: p.codigo_barras || '', nombre: p.nombre,
+      descripcion: p.descripcion || '',
       categoria_id: p.categoria_id || '',
       impuesto_id: p.impuesto_id || impuestoPorDefecto(),
       precio_compra: p.precio_compra, precio_venta: p.precio_venta,
@@ -230,10 +231,17 @@ const Productos = () => {
                   onChange={(e) => setForm({ ...form, codigo: e.target.value })} />
                 <Form.Text className="text-muted">Autogenerado, puedes editarlo.</Form.Text>
               </Col>
-              <Col md={8}>
+              <Col md={4}>
                 <Form.Label>Nombre *</Form.Label>
                 <Form.Control required value={form.nombre}
                   onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+              </Col>
+              <Col md={4}>
+                <Form.Label>Código de barras</Form.Label>
+                <Form.Control value={form.codigo_barras}
+                  placeholder="EAN, Code128…"
+                  onChange={(e) => setForm({ ...form, codigo_barras: e.target.value })} />
+                <Form.Text className="text-muted">Opcional. Para el escáner en Caja.</Form.Text>
               </Col>
               <Col md={12}>
                 <Form.Label>Descripción</Form.Label>
@@ -305,7 +313,7 @@ const Productos = () => {
 };
 
 const vacio = () => ({
-  codigo: '', nombre: '', descripcion: '', categoria_id: '', impuesto_id: '',
+  codigo: '', codigo_barras: '', nombre: '', descripcion: '', categoria_id: '', impuesto_id: '',
   precio_compra: '', precio_venta: '', stock_actual: 0, stock_minimo: 0,
   unidad_medida: 'unidad', activo: 1
 });
