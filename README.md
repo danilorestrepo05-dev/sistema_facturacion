@@ -1,6 +1,6 @@
 # Sistema de Facturación e Inventario
 
-> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.22. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
+> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.23. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
 
 Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Monorepo Full-Stack JS). Diseñado de forma genérica para que pueda adaptarse a otros modelos de negocio (café, peluquería, tienda, etc.) cambiando únicamente registros de la base de datos y variables de entorno.
 
@@ -109,6 +109,11 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 1. Aplicar la migración `backend/sql/12_arqueo.sql` (tabla `turnos_caja`).
 2. En **Configuración** (admin), activar el flag **Arqueo de caja**: aparece el módulo **Arqueo** en el menú.
 3. Flujo diario: el cajero abre turno con su fondo inicial → vende normalmente → al cerrar cuenta el efectivo físico; el sistema calcula lo esperado (fondo + ventas en efectivo) y marca la diferencia como cuadrado / sobrante / faltante. Queda historial por cajero.
+
+## Visador — pantalla del cliente (opcional)
+1. En **Configuración** (admin), activar el flag **Visador**: aparece el botón "Pantalla cliente" en Caja.
+2. Al pulsarlo se abre `/visador` en una ventana nueva (sin barra lateral): muestra los ítems y totales de la venta en tiempo real y un agradecimiento al emitir cada factura.
+3. Está pensado para un **segundo monitor** conectado al mismo PC de caja: arrastra la ventana a esa pantalla y presiona F11 para pantalla completa.
 
 ## Gestión de dependencias
 - El proyecto usa **pnpm v11** (ver `packageManager` en cada `package.json`; instala con `corepack enable pnpm`).

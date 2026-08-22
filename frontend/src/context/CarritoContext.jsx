@@ -4,10 +4,14 @@
 // se desmonta) y la respalda en sessionStorage para sobrevivir a un F5.
 // Al cerrar sesión se vacía para que la venta pendiente de un cajero no
 // aparezca en la sesión del siguiente.
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 
 const CLAVE_STORAGE = 'caja_en_curso';
+// Canal por donde la ventana de Caja publica la venta en curso hacia la
+// pantalla del cliente (visador). Funciona entre pestañas del mismo navegador,
+// ideal para un segundo monitor conectado al mismo PC de caja.
+const CANAL_VISADOR = 'visador-caja';
 
 const CarritoContext = createContext(null);
 
@@ -132,11 +136,43 @@ export const CarritoProvider = ({ children }) => {
     };
   }, [carrito, descuento]);
 
+  // --- Visador (pantalla del cliente, Fase 5) ---
+
+  const canalVisador = useRef(null);
+
+  useEffect(() => {
+    if ('BroadcastChannel' in window) {
+      canalVisador.current = new BroadcastChannel(CANAL_VISADOR);
+      return () => canalVisador.current?.close();
+    }
+  }, []);
+
+  // Publica el estado actual de la venta en el canal del visador.
+  const publicarEstado = useCallback(() => {
+    canalVisador.current?.postMessage({ tipo: 'estado', carrito, totales });
+  }, [carrito, totales]);
+
+  // Publica en cada cambio y responde a los visadores recién abiertos.
+  useEffect(() => {
+    const canal = canalVisador.current;
+    if (!canal) return;
+    canal.onmessage = (evento) => {
+      if (evento.data?.tipo === 'solicitar-estado') publicarEstado();
+    };
+    publicarEstado();
+  }, [publicarEstado]);
+
+  // Avisa al visador que se emitió una factura (muestra la pantalla de gracias).
+  const anunciarVentaEmitida = (numeroFactura, total) => {
+    canalVisador.current?.postMessage({ tipo: 'factura-emitida', numeroFactura, total });
+  };
+
   return (
     <CarritoContext.Provider value={{
       carrito, clienteId, tipoPago, descuento, totales,
       setClienteId, setTipoPago, setDescuento,
-      agregar, cambiarCantidad, cambiarDescuento, quitar, vaciar
+      agregar, cambiarCantidad, cambiarDescuento, quitar, vaciar,
+      anunciarVentaEmitida
     }}>
       {children}
     </CarritoContext.Provider>

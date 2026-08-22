@@ -16,11 +16,21 @@ import Proveedores from './views/Proveedores';
 import Reportes from './views/Reportes';
 import Usuarios from './views/Usuarios';
 import Configuracion from './views/Configuracion';
+import Visador from './views/Visador';
 
 const App = () => (
   <BrowserRouter>
     <Routes>
       <Route path="/login" element={<Login />} />
+      {/* Visador: pantalla del cliente, sin barra lateral (se abre desde Caja) */}
+      <Route
+        path="/visador"
+        element={
+          <ProtectedRoute>
+            <Visador />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/"

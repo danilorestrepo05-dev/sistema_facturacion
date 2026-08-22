@@ -396,6 +396,15 @@ async function main() {
   ok('Admin restaura flag a desactivado',
     configRestaurar.status === 200 && configRestaurar.datos.datos.some((c) => c.clave === 'codigo_barras_habilitado' && c.valor === '0'));
 
+  // Visador (pantalla cliente, Fase 5): el flag se activa y se restaura.
+  const visadorActivar = await peticion('PUT', '/configuracion', tokenAdmin, { clave: 'visador_habilitado', valor: '1' });
+  ok('Admin activa flag de visador',
+    visadorActivar.status === 200 && visadorActivar.datos.datos.some((c) => c.clave === 'visador_habilitado' && c.valor === '1'));
+
+  const visadorRestaurar = await peticion('PUT', '/configuracion', tokenAdmin, { clave: 'visador_habilitado', valor: '0' });
+  ok('Admin restaura flag de visador',
+    visadorRestaurar.status === 200 && visadorRestaurar.datos.datos.some((c) => c.clave === 'visador_habilitado' && c.valor === '0'));
+
   console.log('\n=== 10. Gaveta de dinero (Fase 3) ===');
 
   // El flag gaveta_habilitada está en '0': la apertura debe rechazarse.

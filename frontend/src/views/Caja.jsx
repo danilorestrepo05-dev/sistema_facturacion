@@ -19,7 +19,8 @@ const Caja = () => {
   const {
     carrito, clienteId, tipoPago, descuento, totales,
     setClienteId, setTipoPago, setDescuento,
-    agregar, cambiarCantidad, cambiarDescuento, quitar, vaciar
+    agregar, cambiarCantidad, cambiarDescuento, quitar, vaciar,
+    anunciarVentaEmitida
   } = useCarrito();
 
   // El escáner de códigos de barras solo se muestra si el flag está activo.
@@ -27,6 +28,8 @@ const Caja = () => {
   const escaneoActivo = estaHabilitado('codigo_barras_habilitado');
   // La gaveta de dinero se maneja con el mismo mecanismo de flags.
   const gavetaActiva = estaHabilitado('gaveta_habilitada');
+  // Visador: pantalla que ve el cliente (segunda ventana/monitor).
+  const visadorActivo = estaHabilitado('visador_habilitado');
 
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -145,6 +148,12 @@ const Caja = () => {
     }
   };
 
+  // Abre la pantalla del cliente (visador) en una ventana nueva: se puede
+  // arrastrar a un segundo monitor conectado al mismo PC de caja.
+  const abrirVisador = () => {
+    window.open(`${window.location.origin}/visador`, 'visadorCliente', 'width=900,height=1200');
+  };
+
   const emitir = async () => {
     setGuardando(true);
     setError('');
@@ -162,6 +171,8 @@ const Caja = () => {
         }))
       });
       setEmitido(respuesta.data.datos);
+      // La pantalla del cliente muestra el total final y el agradecimiento.
+      anunciarVentaEmitida(respuesta.data.datos.numero_factura, respuesta.data.datos.total);
       vaciar();
       await cargarDatos();
       // Venta en efectivo: la gaveta se abre sola (sin bloquear la emisión).
@@ -190,7 +201,15 @@ const Caja = () => {
 
   return (
     <div>
-      <h4 className="mb-3">Caja</h4>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h4 className="mb-0">Caja</h4>
+        {visadorActivo && (
+          <Button variant="outline-secondary" size="sm" onClick={abrirVisador}
+            title="Abre la pantalla que ve el cliente (se puede mover a un segundo monitor)">
+            <i className="bi bi-person-video3 me-1"></i>Pantalla cliente
+          </Button>
+        )}
+      </div>
       {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
 
       <Row className="g-3">
