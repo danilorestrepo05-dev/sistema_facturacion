@@ -7,6 +7,7 @@ import Layout from './components/Layout';
 import Login from './views/Login';
 import Dashboard from './views/Dashboard';
 import Caja from './views/Caja';
+import Arqueo from './views/Arqueo';
 import Facturas from './views/Facturas';
 import Productos from './views/Productos';
 import Catalogo from './views/Catalogo';
@@ -32,6 +33,7 @@ const App = () => (
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="caja" element={<Caja />} />
+        <Route path="arqueo" element={<Arqueo />} />
         <Route path="facturas" element={<Facturas />} />
         <Route path="productos" element={<Productos />} />
         <Route path="catalogo" element={<Catalogo />} />

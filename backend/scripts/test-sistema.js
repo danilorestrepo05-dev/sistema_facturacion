@@ -416,7 +416,58 @@ async function main() {
   ok('Gaveta queda restaurada a desactivado',
     gavetaRestaurar.status === 200 && gavetaRestaurar.datos.datos.some((c) => c.clave === 'gaveta_habilitada' && c.valor === '0'));
 
-  console.log('\n=== 11. Anulación y consistencia ===');
+  console.log('\n=== 11. Arqueo de caja (Fase 4) ===');
+
+  // Flag apagado: las operaciones de turno se rechazan.
+  const turnoApagado = await peticion('POST', '/turnos/abrir', tokenCajero, { monto_apertura: 10000 });
+  ok('Arqueo deshabilitado rechaza apertura (409)', turnoApagado.status === 409);
+
+  const arqueoActivar = await peticion('PUT', '/configuracion', tokenAdmin, { clave: 'arqueo_habilitado', valor: '1' });
+  ok('Admin habilita el arqueo', arqueoActivar.status === 200);
+
+  const turnoMontoMalo = await peticion('POST', '/turnos/abrir', tokenCajero, { monto_apertura: -5 });
+  ok('Apertura con monto negativo rechazada (400)', turnoMontoMalo.status === 400);
+
+  const fondo = 10000;
+  const turnoAbierto = await peticion('POST', '/turnos/abrir', tokenCajero, { monto_apertura: fondo });
+  ok('Abrir turno con fondo inicial', turnoAbierto.status === 201 && turnoAbierto.datos.datos.estado === 'abierto');
+
+  const turnoDuplicado = await peticion('POST', '/turnos/abrir', tokenCajero, { monto_apertura: 5000 });
+  ok('Segundo turno simultáneo rechazado (409)', turnoDuplicado.status === 409);
+
+  // Venta en efectivo dentro del turno: producto 1 x1 → total 4000 + 10% = 4400.
+  const ventaTurno = await peticion('POST', '/facturas', tokenCajero, {
+    items: [{ producto_id: idProducto1, cantidad: 1 }]
+  });
+  const totalVentaTurno = Number(ventaTurno.datos.datos.total);
+  ok('Venta en efectivo durante el turno (total=4400)',
+    ventaTurno.status === 201 && igual(totalVentaTurno, 4400), `total=${totalVentaTurno}`);
+
+  const turnoActual = await peticion('GET', '/turnos/actual', tokenCajero);
+  ok('Efectivo esperado en vivo (fondo + ventas)',
+    turnoActual.status === 200 && turnoActual.datos.datos.turno_abierto === true &&
+    igual(Number(turnoActual.datos.datos.efectivo_esperado), fondo + totalVentaTurno),
+    `esperado=${turnoActual.datos.datos.efectivo_esperado}`);
+
+  const turnoCerrar = await peticion('POST', '/turnos/cerrar', tokenCajero, {
+    monto_real: fondo + totalVentaTurno, observaciones: 'Cuadre perfecto del smoke test'
+  });
+  ok('Cerrar turno cuadrado (diferencia 0)',
+    turnoCerrar.status === 200 && igual(Number(turnoCerrar.datos.datos.diferencia), 0) &&
+    turnoCerrar.datos.datos.estado === 'cerrado');
+
+  const turnoRecierre = await peticion('POST', '/turnos/cerrar', tokenCajero, { monto_real: 100 });
+  ok('Cerrar sin turno abierto rechazado (409)', turnoRecierre.status === 409);
+
+  const turnosLista = await peticion('GET', '/turnos', tokenCajero);
+  ok('Historial lista el turno del cajero',
+    turnosLista.status === 200 && turnosLista.datos.datos.some((t) => t.id === turnoAbierto.datos.datos.id));
+
+  const arqueoRestaurar = await peticion('PUT', '/configuracion', tokenAdmin, { clave: 'arqueo_habilitado', valor: '0' });
+  ok('Arqueo queda restaurado a desactivado',
+    arqueoRestaurar.status === 200 && arqueoRestaurar.datos.datos.some((c) => c.clave === 'arqueo_habilitado' && c.valor === '0'));
+
+  console.log('\n=== 12. Anulación y consistencia ===');
 
   const anularCajero = await peticion('POST', `/facturas/${idFactura}/anular`, tokenCajero);
   ok('Cajero NO puede anular factura (403)', anularCajero.status === 403);
@@ -428,9 +479,10 @@ async function main() {
   const stockRestaurado2 = await peticion('GET', `/productos/${idProducto2}`, tokenAdmin);
   // La factura anulada vendió 3 y 2 unidades; las facturas de descuento por
   // línea y de descuentos combinados (que NO se anulan) vendieron 2+1 y 1 del
-  // producto 1, y 1 del producto 2. El stock queda en el inicial menos 3 y 1.
+  // producto 1, y la venta del turno de arqueo vendió 1 del producto 1
+  // (tampoco se anula): el stock queda en el inicial menos 4 y menos 1.
   ok('Stock restaurado tras anulación',
-    igual(stockRestaurado.datos.datos.stock_actual, stockAntes1 - 3) && igual(stockRestaurado2.datos.datos.stock_actual, stockAntes2 - 1),
+    igual(stockRestaurado.datos.datos.stock_actual, stockAntes1 - 4) && igual(stockRestaurado2.datos.datos.stock_actual, stockAntes2 - 1),
     `${stockAntes1}/${stockRestaurado.datos.datos.stock_actual} y ${stockAntes2}/${stockRestaurado2.datos.datos.stock_actual}`);
 
   const repMovAnul = await peticion('GET', `/reportes/movimientos?${rango}&motivo=anulacion`, tokenAdmin);
@@ -439,7 +491,7 @@ async function main() {
   const dobleAnulacion = await peticion('POST', `/facturas/${idFactura}/anular`, tokenAdmin);
   ok('Anular factura ya anulada rechazado (409)', dobleAnulacion.status === 409);
 
-  console.log('\n=== 12. Limpieza ===');
+  console.log('\n=== 13. Limpieza ===');
 
   await peticion('DELETE', `/productos/${idProducto2}`, tokenAdmin);
   await peticion('DELETE', `/productos/${idProducto1}`, tokenAdmin);

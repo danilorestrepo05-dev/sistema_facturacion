@@ -14,6 +14,7 @@ const reporteRoutes = require('./routes/reporte.routes');
 const backupRoutes = require('./routes/backup.routes');
 const configRoutes = require('./routes/config.routes');
 const gavetaRoutes = require('./routes/gaveta.routes');
+const turnoRoutes = require('./routes/turno.routes');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -58,6 +59,9 @@ app.use('/api/v1/configuracion', configRoutes);
 
 // Rutas de la gaveta de dinero (apertura por comando ESC/POS kick).
 app.use('/api/v1/gaveta', gavetaRoutes);
+
+// Rutas de arqueo de caja: turnos con fondo inicial y cuadre al cierre.
+app.use('/api/v1/turnos', turnoRoutes);
 
 // Ruta raíz informativa.
 app.get('/', (req, res) =>

@@ -1,6 +1,6 @@
 # Sistema de Facturación e Inventario
 
-> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.21. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
+> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.22. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
 
 Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Monorepo Full-Stack JS). Diseñado de forma genérica para que pueda adaptarse a otros modelos de negocio (café, peluquería, tienda, etc.) cambiando únicamente registros de la base de datos y variables de entorno.
 
@@ -72,6 +72,10 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 | GET | `/api/v1/configuracion` | Flags de configuración del sistema (funciones opcionales) | Token JWT |
 | PUT | `/api/v1/configuracion` | Actualizar un flag (`{clave, valor}`) | Token JWT (admin) |
 | POST | `/api/v1/gaveta/abrir` | Enviar pulso ESC/POS a la gaveta vía térmica (409 si está deshabilitada) | Token JWT |
+| POST | `/api/v1/turnos/abrir` | Abrir turno de caja con fondo inicial (`{monto_apertura}`) | Token JWT |
+| POST | `/api/v1/turnos/cerrar` | Cerrar turno contando efectivo (`{monto_real, observaciones}`) y cuadrar | Token JWT |
+| GET | `/api/v1/turnos/actual` | Turno abierto del usuario + efectivo esperado en vivo | Token JWT |
+| GET | `/api/v1/turnos` | Historial de turnos (cajeros: solo los propios) | Token JWT |
 
 ## Cómo ejecutar el frontend
 
@@ -100,6 +104,11 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
    - Térmica con IP en red local → `gaveta_modo = red`, `gaveta_direccion = 192.168.x.x:9100`.
    - Impresora compartida de Windows → `gaveta_modo = compartida`, `gaveta_direccion = \\equipo\impresora`.
 4. La gaveta debe estar conectada a la térmica con cable RJ11/RJ12; el pulso lo emite la impresora al recibir el comando ESC/POS kick.
+
+## Arqueo de caja (opcional)
+1. Aplicar la migración `backend/sql/12_arqueo.sql` (tabla `turnos_caja`).
+2. En **Configuración** (admin), activar el flag **Arqueo de caja**: aparece el módulo **Arqueo** en el menú.
+3. Flujo diario: el cajero abre turno con su fondo inicial → vende normalmente → al cerrar cuenta el efectivo físico; el sistema calcula lo esperado (fondo + ventas en efectivo) y marca la diferencia como cuadrado / sobrante / faltante. Queda historial por cajero.
 
 ## Gestión de dependencias
 - El proyecto usa **pnpm v11** (ver `packageManager` en cada `package.json`; instala con `corepack enable pnpm`).

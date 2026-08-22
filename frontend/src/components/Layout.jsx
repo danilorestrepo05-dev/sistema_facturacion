@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { Button, Form, Offcanvas } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
+import { useConfig } from '../context/ConfigContext';
 import { descargarBackup } from '../services/backup';
 
 // Elementos del menú lateral (nombre, ruta e icono).
@@ -21,20 +22,34 @@ const enlaces = [
 ];
 
 // Navegación compartida entre la barra lateral (escritorio) y el menú móvil.
-const Navegacion = ({ esAdmin, onNavegar }) => (
-  <nav className="nav flex-column flex-grow-1 pt-2">
-    {enlaces.map((enlace) => (
-      <NavLink
-        key={enlace.ruta}
-        to={enlace.ruta}
-        onClick={onNavegar}
-        className={({ isActive }) => `nav-link ${isActive ? 'activo' : ''}`}
-      >
-        <i className={`bi ${enlace.icono}`}></i>
-        {enlace.nombre}
-      </NavLink>
-    ))}
-    {esAdmin && (
+// El enlace de Arqueo solo aparece si el flag arqueo_habilitado está activo.
+const Navegacion = ({ esAdmin, onNavegar }) => {
+  const { estaHabilitado } = useConfig();
+
+  return (
+    <nav className="nav flex-column flex-grow-1 pt-2">
+      {enlaces.map((enlace) => (
+        <NavLink
+          key={enlace.ruta}
+          to={enlace.ruta}
+          onClick={onNavegar}
+          className={({ isActive }) => `nav-link ${isActive ? 'activo' : ''}`}
+        >
+          <i className={`bi ${enlace.icono}`}></i>
+          {enlace.nombre}
+        </NavLink>
+      ))}
+      {estaHabilitado('arqueo_habilitado') && (
+        <NavLink
+          to="/arqueo"
+          onClick={onNavegar}
+          className={({ isActive }) => `nav-link ${isActive ? 'activo' : ''}`}
+        >
+          <i className="bi bi-calculator"></i>
+          Arqueo
+        </NavLink>
+      )}
+      {esAdmin && (
       <NavLink
         to="/usuarios"
         onClick={onNavegar}
@@ -55,7 +70,8 @@ const Navegacion = ({ esAdmin, onNavegar }) => (
       </NavLink>
     )}
   </nav>
-);
+  );
+};
 
 const Layout = () => {
   const { usuario, cerrarSesion } = useAuth();
