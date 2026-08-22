@@ -396,7 +396,27 @@ async function main() {
   ok('Admin restaura flag a desactivado',
     configRestaurar.status === 200 && configRestaurar.datos.datos.some((c) => c.clave === 'codigo_barras_habilitado' && c.valor === '0'));
 
-  console.log('\n=== 10. Anulación y consistencia ===');
+  console.log('\n=== 10. Gaveta de dinero (Fase 3) ===');
+
+  // El flag gaveta_habilitada está en '0': la apertura debe rechazarse.
+  const gavetaApagada = await peticion('POST', '/gaveta/abrir', tokenCajero);
+  ok('Gaveta deshabilitada rechaza apertura (409)', gavetaApagada.status === 409);
+
+  const gavetaHabilitar = await peticion('PUT', '/configuracion', tokenAdmin, { clave: 'gaveta_habilitada', valor: '1' });
+  ok('Admin habilita la gaveta', gavetaHabilitar.status === 200);
+
+  // Modo simulacion (sin hardware): responde 200 con simulado=true y no envía nada.
+  const gavetaSimulada = await peticion('POST', '/gaveta/abrir', tokenCajero);
+  ok('Abrir gaveta en modo simulación',
+    gavetaSimulada.status === 200 && gavetaSimulada.datos.datos.simulado === true &&
+    gavetaSimulada.datos.datos.bytes === 5,
+    `bytes=${gavetaSimulada.datos.datos?.bytes}`);
+
+  const gavetaRestaurar = await peticion('PUT', '/configuracion', tokenAdmin, { clave: 'gaveta_habilitada', valor: '0' });
+  ok('Gaveta queda restaurada a desactivado',
+    gavetaRestaurar.status === 200 && gavetaRestaurar.datos.datos.some((c) => c.clave === 'gaveta_habilitada' && c.valor === '0'));
+
+  console.log('\n=== 11. Anulación y consistencia ===');
 
   const anularCajero = await peticion('POST', `/facturas/${idFactura}/anular`, tokenCajero);
   ok('Cajero NO puede anular factura (403)', anularCajero.status === 403);
@@ -419,7 +439,7 @@ async function main() {
   const dobleAnulacion = await peticion('POST', `/facturas/${idFactura}/anular`, tokenAdmin);
   ok('Anular factura ya anulada rechazado (409)', dobleAnulacion.status === 409);
 
-  console.log('\n=== 11. Limpieza ===');
+  console.log('\n=== 12. Limpieza ===');
 
   await peticion('DELETE', `/productos/${idProducto2}`, tokenAdmin);
   await peticion('DELETE', `/productos/${idProducto1}`, tokenAdmin);

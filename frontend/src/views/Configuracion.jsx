@@ -124,6 +124,8 @@ const etiqueta = (clave) => {
   const nombres = {
     codigo_barras_habilitado: 'Códigos de barras',
     gaveta_habilitada: 'Gaveta de dinero',
+    gaveta_modo: 'Gaveta: modo (simulacion | red | compartida)',
+    gaveta_direccion: 'Gaveta: dirección de la térmica (IP:9100 o ruta)',
     arqueo_habilitado: 'Arqueo de caja',
     visador_habilitado: 'Visador (pantalla cliente)'
   };

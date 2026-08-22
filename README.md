@@ -1,6 +1,6 @@
 # Sistema de Facturación e Inventario
 
-> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.20. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
+> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.21. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
 
 Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Monorepo Full-Stack JS). Diseñado de forma genérica para que pueda adaptarse a otros modelos de negocio (café, peluquería, tienda, etc.) cambiando únicamente registros de la base de datos y variables de entorno.
 
@@ -71,6 +71,7 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 | GET | `/api/v1/reportes/movimientos?fecha_desde&fecha_hasta&tipo&motivo` | Movimientos de inventario (resumen y detalle) | Token JWT |
 | GET | `/api/v1/configuracion` | Flags de configuración del sistema (funciones opcionales) | Token JWT |
 | PUT | `/api/v1/configuracion` | Actualizar un flag (`{clave, valor}`) | Token JWT (admin) |
+| POST | `/api/v1/gaveta/abrir` | Enviar pulso ESC/POS a la gaveta vía térmica (409 si está deshabilitada) | Token JWT |
 
 ## Cómo ejecutar el frontend
 
@@ -91,6 +92,14 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 2. En **Configuración** (admin), activar el flag **Códigos de barras**: aparece la barra de escaneo en Caja.
 3. Asignar el código del fabricante a cada producto desde el formulario de Productos (campo opcional).
 4. Escanear en Caja con pistola USB (modo teclado: lee código + Enter) o con la cámara del botón 📷 (el navegador exige `localhost` o HTTPS).
+
+## Gaveta de dinero (opcional)
+1. Aplicar la migración `backend/sql/11_gaveta.sql` (claves `gaveta_modo` y `gaveta_direccion`).
+2. En **Configuración** (admin), activar el flag **Gaveta de dinero**: aparece el botón "Abrir gaveta" en Caja y las ventas en efectivo la abren automáticamente.
+3. Sin hardware el sistema arranca en modo `simulacion` (el comando se confirma pero no se envía). Cuando instales la térmica:
+   - Térmica con IP en red local → `gaveta_modo = red`, `gaveta_direccion = 192.168.x.x:9100`.
+   - Impresora compartida de Windows → `gaveta_modo = compartida`, `gaveta_direccion = \\equipo\impresora`.
+4. La gaveta debe estar conectada a la térmica con cable RJ11/RJ12; el pulso lo emite la impresora al recibir el comando ESC/POS kick.
 
 ## Gestión de dependencias
 - El proyecto usa **pnpm v11** (ver `packageManager` en cada `package.json`; instala con `corepack enable pnpm`).

@@ -25,6 +25,8 @@ const Caja = () => {
   // El escáner de códigos de barras solo se muestra si el flag está activo.
   const { estaHabilitado } = useConfig();
   const escaneoActivo = estaHabilitado('codigo_barras_habilitado');
+  // La gaveta de dinero se maneja con el mismo mecanismo de flags.
+  const gavetaActiva = estaHabilitado('gaveta_habilitada');
 
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -41,6 +43,9 @@ const Caja = () => {
   const [codigoEscaneado, setCodigoEscaneado] = useState('');
   const [avisoEscaneo, setAvisoEscaneo] = useState('');
   const [camaraAbierta, setCamaraAbierta] = useState(false);
+
+  // Aviso del último intento de apertura de la gaveta (éxito o error).
+  const [mensajeGaveta, setMensajeGaveta] = useState('');
 
   useEffect(() => {
     cargarDatos();
@@ -129,6 +134,17 @@ const Caja = () => {
     };
   }, [camaraAbierta]);
 
+  // Abre la gaveta de dinero: el backend envía el comando ESC/POS kick a la
+  // térmica (o lo simula si no hay hardware configurado).
+  const abrirGaveta = async () => {
+    try {
+      const respuesta = await api.post('/gaveta/abrir');
+      setMensajeGaveta(respuesta.data.mensaje || 'Comando de gaveta enviado');
+    } catch (err) {
+      setMensajeGaveta(err.response?.data?.mensaje || 'No se pudo abrir la gaveta');
+    }
+  };
+
   const emitir = async () => {
     setGuardando(true);
     setError('');
@@ -148,6 +164,8 @@ const Caja = () => {
       setEmitido(respuesta.data.datos);
       vaciar();
       await cargarDatos();
+      // Venta en efectivo: la gaveta se abre sola (sin bloquear la emisión).
+      if (tipoPago === 'efectivo' && gavetaActiva) abrirGaveta();
     } catch (err) {
       setError(err.response?.data?.mensaje || 'Error al emitir la factura');
     } finally {
@@ -317,6 +335,23 @@ const Caja = () => {
                 disabled={carrito.length === 0 || guardando} onClick={emitir}>
                 {guardando ? 'Emitiendo…' : <><i className="bi bi-receipt me-2"></i>Cobrar y emitir factura</>}
               </Button>
+
+              {/* Apertura manual de la gaveta (solo si el flag está activo) */}
+              {gavetaActiva && (
+                <>
+                  {mensajeGaveta && (
+                    <Alert variant="info" className="py-2 small mt-2 mb-0"
+                      dismissible onClose={() => setMensajeGaveta('')}>
+                      <i className="bi bi-cash-stack me-1"></i>{mensajeGaveta}
+                    </Alert>
+                  )}
+                  <Button variant="outline-secondary" className="w-100 mt-2"
+                    title="Envía el pulso a la gaveta a través de la impresora térmica"
+                    onClick={abrirGaveta}>
+                    <i className="bi bi-box-arrow-in-up me-2"></i>Abrir gaveta
+                  </Button>
+                </>
+              )}
             </Card.Body>
           </Card>
         </Col>
