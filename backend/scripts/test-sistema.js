@@ -91,6 +91,12 @@ async function main() {
   ok('Login admin', loginAdmin.status === 200 && !!loginAdmin.datos.datos.token);
   const tokenAdmin = loginAdmin.datos.datos.token;
 
+  // Normaliza los flags que este test asume apagados al comenzar (las pruebas
+  // manuales del día a día pueden haberlos dejado activados en la BD).
+  for (const clave of ['arqueo_habilitado', 'gaveta_habilitada']) {
+    await peticion('PUT', '/configuracion', tokenAdmin, { clave, valor: '0' });
+  }
+
   const loginMal = await peticion('POST', '/auth/login', null, { nombre_usuario: 'admin', contrasena: 'incorrecta' });
   ok('Login con contraseña incorrecta rechazado', loginMal.status === 401);
 
@@ -309,6 +315,21 @@ async function main() {
   });
   ok('Descuento de línea negativo rechazado (400)', descNegativo.status === 400);
 
+  // v0.9.24: el descuento TOTAL no puede dejar la venta en $0 ni negativa.
+  // p1 x1 = 4000 + 10% = 4400 de valor de venta.
+  const descGigante = await peticion('POST', '/facturas', tokenCajero, {
+    descuento: 999999,
+    items: [{ producto_id: idProducto1, cantidad: 1 }]
+  });
+  ok('Descuento total mayor al valor de la venta rechazado (400)',
+    descGigante.status === 400, descGigante.datos?.mensaje || '');
+
+  const descExacto = await peticion('POST', '/facturas', tokenCajero, {
+    descuento: 4400,
+    items: [{ producto_id: idProducto1, cantidad: 1 }]
+  });
+  ok('Descuento que deja la venta en $0 rechazado (400)', descExacto.status === 400);
+
   // Anti-regresión: línea ($500) + adicional ($300) se suman UNA sola vez.
   // p1: 4000 - 500 = 3500 -> IVA 10% = 350; descuento total 800; total 3550.
   const facturaAmbos = await peticion('POST', '/facturas', tokenCajero, {
@@ -434,6 +455,13 @@ async function main() {
   const arqueoActivar = await peticion('PUT', '/configuracion', tokenAdmin, { clave: 'arqueo_habilitado', valor: '1' });
   ok('Admin habilita el arqueo', arqueoActivar.status === 200);
 
+  // v0.9.24: con el arqueo activo no se puede vender sin turno abierto.
+  const ventaSinTurno = await peticion('POST', '/facturas', tokenCajero, {
+    items: [{ producto_id: idProducto1, cantidad: 1 }]
+  });
+  ok('Venta sin turno abierto rechazada con arqueo activo (409)',
+    ventaSinTurno.status === 409, ventaSinTurno.datos?.mensaje || '');
+
   const turnoMontoMalo = await peticion('POST', '/turnos/abrir', tokenCajero, { monto_apertura: -5 });
   ok('Apertura con monto negativo rechazada (400)', turnoMontoMalo.status === 400);
 
@@ -467,6 +495,12 @@ async function main() {
 
   const turnoRecierre = await peticion('POST', '/turnos/cerrar', tokenCajero, { monto_real: 100 });
   ok('Cerrar sin turno abierto rechazado (409)', turnoRecierre.status === 409);
+
+  // v0.9.24: cerrado el turno, la venta vuelve a bloquearse (flag sigue activo).
+  const ventaTrasCierre = await peticion('POST', '/facturas', tokenCajero, {
+    items: [{ producto_id: idProducto1, cantidad: 1 }]
+  });
+  ok('Venta tras cerrar el turno también rechazada (409)', ventaTrasCierre.status === 409);
 
   const turnosLista = await peticion('GET', '/turnos', tokenCajero);
   ok('Historial lista el turno del cajero',

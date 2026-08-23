@@ -20,7 +20,7 @@ const Caja = () => {
     carrito, clienteId, tipoPago, descuento, totales,
     setClienteId, setTipoPago, setDescuento,
     agregar, cambiarCantidad, cambiarDescuento, quitar, vaciar,
-    anunciarVentaEmitida
+    anunciarVentaEmitida, anunciarNuevaVenta
   } = useCarrito();
 
   // El escáner de códigos de barras solo se muestra si el flag está activo.
@@ -30,6 +30,8 @@ const Caja = () => {
   const gavetaActiva = estaHabilitado('gaveta_habilitada');
   // Visador: pantalla que ve el cliente (segunda ventana/monitor).
   const visadorActivo = estaHabilitado('visador_habilitado');
+  // Con el arqueo activo se exige un turno abierto para vender (v0.9.24).
+  const arqueoActivo = estaHabilitado('arqueo_habilitado');
 
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -39,6 +41,10 @@ const Caja = () => {
   const [termino, setTermino] = useState('');
   const [emitido, setEmitido] = useState(null); // factura emitida (modal)
   const [guardando, setGuardando] = useState(false);
+
+  // Estado del turno de caja del usuario (solo se consulta si hay arqueo):
+  // { turno_abierto: false } o { turno_abierto: true, turno, efectivo_esperado }.
+  const [turnoInfo, setTurnoInfo] = useState(null);
 
   // Escáner de códigos de barras (pistola USB o cámara).
   const inputEscaneoRef = useRef(null);
@@ -53,6 +59,25 @@ const Caja = () => {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // Consulta el turno abierto del usuario cuando el arqueo está activo.
+  // Sin turno la venta se bloquea en la pantalla y también lo valida el backend.
+  const consultarTurno = async () => {
+    if (!estaHabilitado('arqueo_habilitado')) {
+      setTurnoInfo(null);
+      return;
+    }
+    try {
+      const respuesta = await api.get('/turnos/actual');
+      setTurnoInfo(respuesta.data.datos);
+    } catch {
+      setTurnoInfo({ turno_abierto: false });
+    }
+  };
+
+  useEffect(() => {
+    consultarTurno();
+  }, [arqueoActivo]);
 
   const cargarDatos = async () => {
     setCargando(true);
@@ -82,6 +107,13 @@ const Caja = () => {
          (p.categoria_nombre || '').toLowerCase().includes(t))
     );
   }, [productos, termino]);
+
+  // El descuento total (líneas + adicional) no puede dejar la venta en $0
+  // ni en negativo; el backend lo rechaza con 400 como segunda barrera.
+  const ventaSinSaldo = carrito.length > 0 && totales.total <= 0;
+
+  // Con arqueo activo y sin turno abierto no se puede vender.
+  const ventaBloqueadaPorTurno = arqueoActivo && !!turnoInfo && !turnoInfo.turno_abierto;
 
   // Busca el producto por código de barras y lo agrega a la venta.
   const procesarCodigo = async (valor) => {
@@ -175,6 +207,7 @@ const Caja = () => {
       anunciarVentaEmitida(respuesta.data.datos.numero_factura, respuesta.data.datos.total);
       vaciar();
       await cargarDatos();
+      consultarTurno(); // refresca el estado del turno tras la venta
       // Venta en efectivo: la gaveta se abre sola (sin bloquear la emisión).
       if (tipoPago === 'efectivo' && gavetaActiva) abrirGaveta();
     } catch (err) {
@@ -182,6 +215,12 @@ const Caja = () => {
     } finally {
       setGuardando(false);
     }
+  };
+
+  // Cierra el modal de venta emitida y devuelve el visador al estado de espera.
+  const cerrarModalEmitido = () => {
+    setEmitido(null);
+    anunciarNuevaVenta();
   };
 
   // Abre el ticket o el PDF de la factura recién emitida (token vía interceptor).
@@ -211,6 +250,21 @@ const Caja = () => {
         )}
       </div>
       {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+
+      {/* Estado del turno de caja (solo con arqueo activo, v0.9.24) */}
+      {arqueoActivo && turnoInfo && (
+        !turnoInfo.turno_abierto ? (
+          <Alert variant="warning" className="py-2">
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>
+            El arqueo está activo y no tienes turno abierto: ábrelo en el módulo <strong>Arqueo</strong> para poder vender.
+          </Alert>
+        ) : (
+          <Alert variant="info" className="py-2 small">
+            <i className="bi bi-calculator me-2"></i>
+            Turno abierto desde {new Date(turnoInfo.turno.fecha_apertura).toLocaleTimeString()} · fondo inicial {formatoMoneda(turnoInfo.turno.monto_apertura)}
+          </Alert>
+        )
+      )}
 
       <Row className="g-3">
         {/* Columna izquierda: escáner, búsqueda y productos */}
@@ -332,12 +386,17 @@ const Caja = () => {
                 </Col>
               </Row>
 
-              <InputGroup size="sm" className="mb-3">
+              <InputGroup size="sm" className="mb-2">
                 <InputGroup.Text>Descuento adicional $</InputGroup.Text>
                 <Form.Control type="number" min={0} value={descuento}
                   onChange={(e) => setDescuento(e.target.value)}
                   onWheel={(e) => e.currentTarget.blur()} />
               </InputGroup>
+              {ventaSinSaldo && (
+                <Alert variant="danger" className="py-2 small mb-3">
+                  El descuento no puede superar ni igualar el valor de la venta.
+                </Alert>
+              )}
 
               <div className="border-top pt-2">
                 <FilaTotal etiqueta="Subtotal" valor={formatoMoneda(totales.subtotal)} />
@@ -351,7 +410,8 @@ const Caja = () => {
               </div>
 
               <Button variant="success" className="w-100 mt-3" size="lg"
-                disabled={carrito.length === 0 || guardando} onClick={emitir}>
+                disabled={carrito.length === 0 || guardando || ventaSinSaldo || ventaBloqueadaPorTurno}
+                onClick={emitir}>
                 {guardando ? 'Emitiendo…' : <><i className="bi bi-receipt me-2"></i>Cobrar y emitir factura</>}
               </Button>
 
@@ -377,7 +437,7 @@ const Caja = () => {
       </Row>
 
       {/* Modal de factura emitida con opciones de impresión */}
-      <Modal show={!!emitido} onHide={() => setEmitido(null)} centered>
+      <Modal show={!!emitido} onHide={cerrarModalEmitido} centered>
         <Modal.Header closeButton>
           <Modal.Title>Factura emitida</Modal.Title>
         </Modal.Header>
@@ -393,7 +453,7 @@ const Caja = () => {
           <Button variant="outline-secondary" onClick={() => imprimir('pdf', 'media_carta')}>
             <i className="bi bi-file-earmark-pdf me-1"></i>PDF
           </Button>
-          <Button variant="success" onClick={() => setEmitido(null)}>Nueva venta</Button>
+          <Button variant="success" onClick={cerrarModalEmitido}>Nueva venta</Button>
         </Modal.Footer>
       </Modal>
 

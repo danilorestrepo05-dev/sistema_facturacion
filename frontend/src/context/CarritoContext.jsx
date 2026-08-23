@@ -167,12 +167,18 @@ export const CarritoProvider = ({ children }) => {
     canalVisador.current?.postMessage({ tipo: 'factura-emitida', numeroFactura, total });
   };
 
+  // Devuelve el visador al estado de espera: se usa cuando el cajero cierra el
+  // modal de venta emitida para empezar otra de inmediato.
+  const anunciarNuevaVenta = useCallback(() => {
+    canalVisador.current?.postMessage({ tipo: 'nueva-venta' });
+  }, []);
+
   return (
     <CarritoContext.Provider value={{
       carrito, clienteId, tipoPago, descuento, totales,
       setClienteId, setTipoPago, setDescuento,
       agregar, cambiarCantidad, cambiarDescuento, quitar, vaciar,
-      anunciarVentaEmitida
+      anunciarVentaEmitida, anunciarNuevaVenta
     }}>
       {children}
     </CarritoContext.Provider>

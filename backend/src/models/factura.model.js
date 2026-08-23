@@ -164,6 +164,16 @@ const crear = async (datos, usuarioId) => {
     const descuentoNum = Number(descuento || 0);
     // El descuento total de la factura suma los descuentos de línea y el de factura.
     const descuentoTotal = descuentoLineas + descuentoNum;
+
+    // El descuento total no puede dejar la venta en $0 ni en negativo
+    // (evita errores del cajero y ventas gratuitas accidentales).
+    if (descuentoTotal >= subtotal + impuestoTotal) {
+      throw Object.assign(
+        new Error('El descuento no puede superar ni igualar el valor de la venta'),
+        { status: 400 }
+      );
+    }
+
     const total = Math.max(0, subtotal + impuestoTotal - descuentoTotal);
 
     // Inserta la factura.

@@ -1,6 +1,8 @@
 // src/controllers/factura.controller.js
 // Lógica de facturación: crear, listar, ver detalle y anular facturas.
 const facturaModel = require('../models/factura.model');
+const configModel = require('../models/config.model');
+const turnoModel = require('../models/turno.model');
 const pdfService = require('../services/pdf.service');
 const ticketService = require('../services/ticket.service');
 const { jsonExito, jsonError } = require('../utils/response');
@@ -39,7 +41,7 @@ const obtener = async (req, res, next) => {
 };
 
 // POST /api/v1/facturas
-// Body: { cliente_id?, tipo_pago?, descuento?, items: [{ producto_id, cantidad, descuento? }] }
+// Body: { cliente_id, tipo_pago, descuento, items: [{ producto_id, cantidad, descuento }] }
 const crear = async (req, res, next) => {
   try {
     const { cliente_id, tipo_pago, descuento, items } = req.body || {};
@@ -47,6 +49,16 @@ const crear = async (req, res, next) => {
     const errorValidacion = validarCreacion(req.body);
     if (errorValidacion) {
       return jsonError(res, errorValidacion, 400);
+    }
+
+    // Si el arqueo está activo, exige un turno abierto del cajero antes de
+    // vender: ninguna venta puede quedar por fuera del cuadre de caja.
+    const config = await configModel.listarMapa();
+    if ((config.arqueo_habilitado || '0') === '1') {
+      const turno = await turnoModel.buscarAbiertoPorUsuario(req.usuario.id);
+      if (!turno) {
+        return jsonError(res, 'Debe abrir un turno de caja antes de vender', 409);
+      }
     }
 
     const factura = await facturaModel.crear({

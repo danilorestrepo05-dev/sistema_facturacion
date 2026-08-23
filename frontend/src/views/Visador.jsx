@@ -23,11 +23,25 @@ const Visador = () => {
       canal.onmessage = (evento) => {
         const datos = evento.data || {};
         if (datos.tipo === 'estado') {
-          // Mientras se muestra la pantalla de "gracias" se ignora el vaciado
-          // automático del carrito que hace Caja justo después de emitir.
+          const hayItems = Array.isArray(datos.carrito) && datos.carrito.length > 0;
+          // Si ya empezó la siguiente venta, el agradecimiento se corta al
+          // instante para mostrarla. El vaciado automático del carrito que
+          // hace Caja justo después de emitir (mensaje sin ítems) sigue
+          // ignorándose mientras dura el agradecimiento.
+          if (hayItems && graciasVigente.current) {
+            clearTimeout(graciasVigente.current);
+            graciasVigente.current = null;
+            setGracias(null);
+          }
           if (!graciasVigente.current) {
             setVenta({ carrito: datos.carrito || [], totales: datos.totales });
           }
+        }
+        // El cajero cerró el modal de venta emitida: volver a esperar ya.
+        if (datos.tipo === 'nueva-venta') {
+          clearTimeout(graciasVigente.current);
+          graciasVigente.current = null;
+          setGracias(null);
         }
         if (datos.tipo === 'factura-emitida') {
           setGracias({ numeroFactura: datos.numeroFactura, total: datos.total });

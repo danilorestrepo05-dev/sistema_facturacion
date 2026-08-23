@@ -1,6 +1,6 @@
 # Sistema de Facturación e Inventario
 
-> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.23. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
+> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.24. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
 
 Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Monorepo Full-Stack JS). Diseñado de forma genérica para que pueda adaptarse a otros modelos de negocio (café, peluquería, tienda, etc.) cambiando únicamente registros de la base de datos y variables de entorno.
 
@@ -11,7 +11,7 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 
 ## Estado actual (v0.9.14)
 - Base de datos `sistema_facturacion` con tablas `usuarios`, `impuestos`, `categorias`, `productos`, `clientes`, `proveedores`, `facturas`, `detalles_factura`, `movimientos_inventario` y `configuraciones`.
-- **Descuentos**: por línea (monto $ con tope al valor de la línea; impuesto calculado sobre la base reducida) y descuento adicional de factura; desglose visible en el detalle de Facturas, ticket POS y PDF.
+- **Descuentos**: por línea (monto $ con tope al valor de la línea; impuesto calculado sobre la base reducida) y descuento adicional de factura; desglose visible en el detalle de Facturas, ticket POS y PDF. El descuento total no puede dejar la venta en $0 ni en negativo (400 del backend + aviso en Caja).
 - **Módulo de configuraciones**: flags por instalación (códigos de barras, gaveta de dinero, arqueo de caja, visador) que activan o desactivan funciones opcionales en toda la interfaz; pantalla de administración exclusiva del admin (`/configuracion`).
 - **Carrito persistente en Caja**: la venta en curso sobrevive la navegación entre módulos y un refresco de página (sessionStorage); se vacía al cerrar sesión o al emitir la factura.
 - Backend con autenticación JWT + bcrypt.
@@ -109,11 +109,13 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 1. Aplicar la migración `backend/sql/12_arqueo.sql` (tabla `turnos_caja`).
 2. En **Configuración** (admin), activar el flag **Arqueo de caja**: aparece el módulo **Arqueo** en el menú.
 3. Flujo diario: el cajero abre turno con su fondo inicial → vende normalmente → al cerrar cuenta el efectivo físico; el sistema calcula lo esperado (fondo + ventas en efectivo) y marca la diferencia como cuadrado / sobrante / faltante. Queda historial por cajero.
+4. Con el arqueo activo **no se puede vender sin turno abierto**: el backend rechaza la venta con 409 y Caja muestra un aviso para abrir turno (cada cajero necesita su propio turno). Las ventas hechas sin turno quedarían por fuera del cuadre, por eso se bloquean.
 
 ## Visador — pantalla del cliente (opcional)
 1. En **Configuración** (admin), activar el flag **Visador**: aparece el botón "Pantalla cliente" en Caja.
 2. Al pulsarlo se abre `/visador` en una ventana nueva (sin barra lateral): muestra los ítems y totales de la venta en tiempo real y un agradecimiento al emitir cada factura.
 3. Está pensado para un **segundo monitor** conectado al mismo PC de caja: arrastra la ventana a esa pantalla y presiona F11 para pantalla completa.
+4. Al cerrar el modal "Factura emitida" (botón "Nueva venta") el visador vuelve a la espera de inmediato; si el cajero empieza a agregar productos durante el agradecimiento, este se corta solo y muestra la nueva venta.
 
 ## Gestión de dependencias
 - El proyecto usa **pnpm v11** (ver `packageManager` en cada `package.json`; instala con `corepack enable pnpm`).
