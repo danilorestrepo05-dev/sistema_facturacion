@@ -4,7 +4,8 @@
 const compraModel = require('../models/compra.model');
 const { jsonExito, jsonError } = require('../utils/response');
 
-// POST /api/v1/compras  Body: { items: [{ producto_id, cantidad, costo_unitario }] }
+// POST /api/v1/compras
+// Body: { proveedor_id?: number, items: [{ producto_id, cantidad, costo_unitario }] }
 const crear = async (req, res, next) => {
   try {
     if (req.usuario.rol !== 'admin') {
@@ -16,7 +17,10 @@ const crear = async (req, res, next) => {
       return jsonError(res, 'Debes incluir al menos un producto en la compra', 400);
     }
 
-    const resultado = await compraModel.crear({ items });
+    const resultado = await compraModel.crear(
+      { items, proveedor_id: req.body?.proveedor_id },
+      req.usuario.id
+    );
     return jsonExito(res, resultado, 'Compra registrada', 201);
   } catch (err) {
     return next(err);

@@ -1,10 +1,12 @@
 // src/views/Compras.jsx
 // Compras / ingreso de mercancía: permite al administrador registrar entradas
-// de stock con su costo unitario. Cada línea suma inventario, puede actualizar
-// el precio de compra del producto y queda como movimiento con motivo 'compra'.
-import { useEffect, useMemo, useState } from 'react';
+// de stock con su costo unitario y el proveedor. Cada línea suma inventario,
+// puede actualizar el precio de compra del producto y queda como movimiento
+// con motivo 'compra'. Incluye escáner de código de barras como en Caja.
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import {
-  Row, Col, Card, Form, Button, Table, Spinner, Alert
+  Row, Col, Card, Form, Button, Spinner, Alert, InputGroup
 } from 'react-bootstrap';
 import api from '../services/api';
 import { formatoMoneda } from '../utils/format';
@@ -14,21 +16,32 @@ const filaVacia = () => ({ producto_id: '', cantidad: '', costo_unitario: '' });
 
 const Compras = () => {
   const [productos, setProductos] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
+  const [proveedorId, setProveedorId] = useState('');
   const [lineas, setLineas] = useState([filaVacia()]);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
   const [exito, setExito] = useState(null); // Resumen de la última compra registrada
 
-  // Carga el catálogo de productos activos para los selectores.
+  // Escáner de código de barras (la pistola USB escribe y envía Enter).
+  const [codigoEscaneado, setCodigoEscaneado] = useState('');
+  const [avisoEscaneo, setAvisoEscaneo] = useState('');
+  const escaneoRef = useRef(null);
+
+  // Carga el catálogo de productos y proveedores activos.
   useEffect(() => {
     const cargar = async () => {
       setCargando(true);
       try {
-        const resp = await api.get('/productos');
-        setProductos(resp.data.datos.filter((p) => p.activo === 1));
+        const [respProductos, respProveedores] = await Promise.all([
+          api.get('/productos'),
+          api.get('/proveedores')
+        ]);
+        setProductos(respProductos.data.datos.filter((p) => p.activo === 1));
+        setProveedores(respProveedores.data.datos.filter((p) => p.activo === 1));
       } catch (err) {
-        setError(err.response?.data?.mensaje || 'Error al cargar productos');
+        setError(err.response?.data?.mensaje || 'Error al cargar datos');
       } finally {
         setCargando(false);
       }
@@ -46,10 +59,59 @@ const Compras = () => {
   const quitarLinea = (indice) =>
     setLineas((prev) => (prev.length === 1 ? [filaVacia()] : prev.filter((_, i) => i !== indice)));
 
-  // Validaciones en pantalla: líneas completas y sin productos repetidos.
-  const lineasValidas = lineas.every(
-    (l) => l.producto_id && Number(l.cantidad) > 0 && Number.isInteger(Number(l.cantidad))
-  );
+  // Busca el producto por código de barras y lo agrega (o suma uno) a las líneas.
+  const procesarCodigo = async (valor) => {
+    const codigo = String(valor || '').trim();
+    if (!codigo) return;
+    setAvisoEscaneo('');
+    try {
+      const respuesta = await api.get(`/productos/codigo-barras/${encodeURIComponent(codigo)}`);
+      const producto = respuesta.data.datos;
+
+      setLineas((prev) => {
+        // Si el producto ya está en una línea, suma una unidad a esa línea.
+        const indice = prev.findIndex((l) => Number(l.producto_id) === producto.id);
+        if (indice >= 0) {
+          return prev.map((l, i) =>
+            i === indice ? { ...l, cantidad: String(Number(l.cantidad || 0) + 1) } : l
+          );
+        }
+        // Si hay una línea vacía, úsala; si no, agrega una nueva.
+        const vacia = prev.findIndex((l) => !l.producto_id);
+        const nueva = { producto_id: String(producto.id), cantidad: '1', costo_unitario: '' };
+        if (vacia >= 0) return prev.map((l, i) => (i === vacia ? nueva : l));
+        return [...prev, nueva];
+      });
+
+      setCodigoEscaneado('');
+      escaneoRef.current?.focus(); // listo para el siguiente escaneo
+    } catch (err) {
+      setAvisoEscaneo(err.response?.data?.mensaje || 'Error al buscar el código de barras');
+      setCodigoEscaneado('');
+    }
+  };
+
+  // La pistola USB escribe el código y envía Enter, como un teclado.
+  const teclaEscaneo = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      procesarCodigo(codigoEscaneado);
+    }
+  };
+
+  // Validaciones en pantalla: líneas completas (costo obligatorio >= 0)
+  // y sin productos repetidos.
+  const lineasValidas = lineas.every((l) => {
+    const costo = l.costo_unitario;
+    return (
+      l.producto_id &&
+      Number(l.cantidad) > 0 &&
+      Number.isInteger(Number(l.cantidad)) &&
+      costo !== '' &&
+      Number.isFinite(Number(costo)) &&
+      Number(costo) >= 0
+    );
+  });
   const hayRepetidos = (() => {
     const ids = lineas.filter((l) => l.producto_id).map((l) => Number(l.producto_id));
     return new Set(ids).size !== ids.length;
@@ -80,11 +142,15 @@ const Compras = () => {
       const items = lineas.map((l) => ({
         producto_id: Number(l.producto_id),
         cantidad: Number(l.cantidad),
-        costo_unitario: l.costo_unitario === '' ? 0 : Number(l.costo_unitario)
+        costo_unitario: Number(l.costo_unitario)
       }));
-      const resp = await api.post('/compras', { items });
+      const resp = await api.post('/compras', {
+        proveedor_id: proveedorId || null,
+        items
+      });
       setExito(resp.data.datos);
       setLineas([filaVacia()]);
+      setProveedorId('');
       // Refresca el catálogo porque cambiaron stock y costos.
       const respProductos = await api.get('/productos');
       setProductos(respProductos.data.datos.filter((p) => p.activo === 1));
@@ -113,14 +179,36 @@ const Compras = () => {
           <Card.Body>
             <p className="text-secondary small mb-4">
               Registra la mercancía que llega del proveedor: suma stock, actualiza el precio
-              de compra y deja el movimiento en el reporte de inventario.
+              de compra y deja el movimiento en el reporte de inventario. ¿El producto aún no
+              existe? Créalo primero en{' '}
+              <Link to="/productos">Productos</Link>.
             </p>
 
             {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
 
+            {/* Escáner de código de barras */}
+            <Form.Group className="mb-3" controlId="escaneo-compra">
+              <Form.Label className="small mb-1">Escanear código de barras</Form.Label>
+              <InputGroup>
+                <InputGroup.Text><i className="bi bi-upc-scan"></i></InputGroup.Text>
+                <Form.Control
+                  ref={escaneoRef}
+                  autoComplete="off"
+                  placeholder="Dispara la pistola o digita el código y presiona Enter"
+                  value={codigoEscaneado}
+                  onChange={(e) => setCodigoEscaneado(e.target.value)}
+                  onKeyDown={teclaEscaneo}
+                />
+              </InputGroup>
+              <Form.Text muted>
+                Si el producto ya está en la lista, suma una unidad; si no, agrega una línea nueva.
+              </Form.Text>
+              {avisoEscaneo && <Alert variant="warning" className="py-2 small mt-2 mb-0">{avisoEscaneo}</Alert>}
+            </Form.Group>
+
             {exito && (
               <Alert variant="success" dismissible onClose={() => setExito(null)}>
-                <div className="fw-semibold">Compra registrada</div>
+                <div className="fw-semibold">Compra #{exito.compra_id} registrada</div>
                 {exito.items.map((i) => (
                   <div key={i.producto_id} className="small">
                     +{i.cantidad} × {i.nombre} ({formatoMoneda(i.costo_unitario)} c/u)
@@ -134,9 +222,22 @@ const Compras = () => {
             )}
 
             <Form onSubmit={enviar}>
+              {/* Proveedor opcional de la compra */}
+              <Row className="g-2 mb-3">
+                <Col md={6} sm={12}>
+                  <Form.Label className="small mb-1">Proveedor</Form.Label>
+                  <Form.Select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)}>
+                    <option value="">Sin proveedor / varios</option>
+                    {proveedores.map((p) => (
+                      <option key={p.id} value={p.id}>{p.nombre}</option>
+                    ))}
+                  </Form.Select>
+                </Col>
+              </Row>
+
               {lineas.map((linea, indice) => (
                 <Row key={indice} className="align-items-end g-2 mb-2">
-                  <Col md={6} sm={12}>
+                  <Col md={5} sm={12}>
                     <Form.Label className="small mb-1">Producto</Form.Label>
                     <Form.Select
                       value={linea.producto_id}
@@ -163,15 +264,16 @@ const Compras = () => {
                       required
                     />
                   </Col>
-                  <Col md={3} xs={5}>
-                    <Form.Label className="small mb-1">Costo unitario ($)</Form.Label>
+                  <Col md={4} xs={5}>
+                    <Form.Label className="small mb-1">Costo unitario ($) *</Form.Label>
                     <Form.Control
                       type="number"
                       min={0}
                       step="0.01"
-                      placeholder="Opcional"
+                      placeholder="0.00"
                       value={linea.costo_unitario}
                       onChange={(e) => cambiarLinea(indice, 'costo_unitario', e.target.value)}
+                      required
                     />
                   </Col>
                   <Col md={1} xs={3} className="d-flex gap-1 pb-1">
@@ -186,6 +288,11 @@ const Compras = () => {
                   </Col>
                 </Row>
               ))}
+
+              <Form.Text muted className="d-block mb-2">
+                * El costo es obligatorio para valorar el inventario. Usa 0 solo para
+                bonificaciones sin costo.
+              </Form.Text>
 
               {hayRepetidos && (
                 <Alert variant="warning" className="py-2 small">

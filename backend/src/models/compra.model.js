@@ -1,22 +1,23 @@
 // src/models/compra.model.js
 // Compras / ingreso de mercancía: registra entradas de stock con su costo.
-// Cada línea suma stock, puede actualizar el precio de compra del producto
-// y genera un movimiento de inventario con motivo 'compra'.
+// Cada compra tiene una cabecera (proveedor, usuario y total) y genera un
+// movimiento de inventario por línea con motivo 'compra' apuntando a ella.
 const pool = require('../config/db');
 
-// Crea una compra dentro de una transacción: valida las líneas, bloquea los
-// productos, actualiza stock/costos e inserta los movimientos de entrada.
-async function crear({ items }) {
+// Crea una compra dentro de una transacción: valida las líneas y el proveedor,
+// bloquea los productos, actualiza stock/costos e inserta los movimientos.
+async function crear({ items, proveedor_id }, usuarioId) {
   const conexion = await pool.getConnection();
   try {
     await conexion.beginTransaction();
 
     // Normaliza y valida cada línea antes de tocar la base de datos.
+    // El costo unitario es obligatorio (>= 0) para valorar el inventario.
     const lineas = [];
     for (const item of items) {
       const productoId = Number(item.producto_id);
       const cantidad = Number(item.cantidad);
-      const costo = item.costo_unitario === '' || item.costo_unitario === undefined || item.costo_unitario === null ? 0 : Number(item.costo_unitario);
+      const costoBruto = item.costo_unitario;
 
       if (!Number.isInteger(productoId) || productoId <= 0) {
         const error = new Error('Cada línea necesita un producto válido');
@@ -28,8 +29,11 @@ async function crear({ items }) {
         error.status = 400;
         throw error;
       }
-      if (!Number.isFinite(costo) || costo < 0) {
-        const error = new Error('El costo unitario debe ser numérico mayor o igual a 0');
+      if (
+        costoBruto === undefined || costoBruto === null || costoBruto === '' ||
+        !Number.isFinite(Number(costoBruto)) || Number(costoBruto) < 0
+      ) {
+        const error = new Error('El costo unitario es obligatorio y debe ser numérico mayor o igual a 0');
         error.status = 400;
         throw error;
       }
@@ -40,13 +44,28 @@ async function crear({ items }) {
         throw error;
       }
 
-      lineas.push({ producto_id: productoId, cantidad, costo });
+      lineas.push({ producto_id: productoId, cantidad, costo: Number(costoBruto) });
     }
 
     if (lineas.length === 0) {
       const error = new Error('La compra debe tener al menos un producto');
       error.status = 400;
       throw error;
+    }
+
+    // El proveedor es opcional; si viene debe existir y estar activo.
+    let idProveedor = null;
+    if (proveedor_id !== undefined && proveedor_id !== null && proveedor_id !== '') {
+      const [proveedores] = await conexion.query(
+        'SELECT id FROM proveedores WHERE id = ? AND activo = 1',
+        [Number(proveedor_id)]
+      );
+      if (proveedores.length === 0) {
+        const error = new Error('Proveedor no encontrado o inactivo');
+        error.status = 404;
+        throw error;
+      }
+      idProveedor = proveedores[0].id;
     }
 
     // Bloquea y valida cada producto: debe existir y estar activo.
@@ -64,7 +83,16 @@ async function crear({ items }) {
       productos[linea.producto_id] = filas[0];
     }
 
-    let costoTotal = 0;
+    // Total de la compra para la cabecera.
+    const total = lineas.reduce((suma, l) => suma + l.cantidad * l.costo, 0);
+
+    // Cabecera de la compra: quién compró, a qué proveedor y por cuánto.
+    const [cabecera] = await conexion.query(
+      'INSERT INTO compras (proveedor_id, usuario_id, total) VALUES (?, ?, ?)',
+      [idProveedor, usuarioId, Number(total.toFixed(2))]
+    );
+    const compraId = cabecera.insertId;
+
     let unidadesTotales = 0;
     const detalle = [];
 
@@ -85,14 +113,14 @@ async function crear({ items }) {
         );
       }
 
-      // Movimiento de entrada con motivo compra y su costo unitario.
+      // Movimiento de entrada ligado a la cabecera con su costo unitario.
       await conexion.query(
-        `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, costo_unitario, motivo)
-         VALUES (?, 'entrada', ?, ?, 'compra')`,
-        [linea.producto_id, linea.cantidad, linea.costo]
+        `INSERT INTO movimientos_inventario
+           (producto_id, tipo, cantidad, costo_unitario, motivo, referencia_id)
+         VALUES (?, 'entrada', ?, ?, 'compra', ?)`,
+        [linea.producto_id, linea.cantidad, linea.costo, compraId]
       );
 
-      costoTotal += linea.cantidad * linea.costo;
       unidadesTotales += linea.cantidad;
       detalle.push({
         producto_id: linea.producto_id,
@@ -105,9 +133,11 @@ async function crear({ items }) {
     await conexion.commit();
 
     return {
+      compra_id: compraId,
+      proveedor_id: idProveedor,
       items: detalle,
       unidades: unidadesTotales,
-      costo_total: Number(costoTotal.toFixed(2))
+      costo_total: Number(total.toFixed(2))
     };
   } catch (err) {
     await conexion.rollback();

@@ -1,6 +1,6 @@
 # Sistema de Facturación e Inventario
 
-> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.26. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
+> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.27. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
 
 Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Monorepo Full-Stack JS). Diseñado de forma genérica para que pueda adaptarse a cualquier modelo de negocio (tienda, peluquería, droguería, restaurante, etc.) cambiando únicamente registros de la base de datos y variables de entorno.
 
@@ -9,7 +9,7 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 - **Backend:** Node.js + Express 5 (`backend/`).
 - **Frontend:** React + Vite + Bootstrap 5 (`frontend/`, en desarrollo).
 
-## Estado actual (v0.9.26)
+## Estado actual (v0.9.27)
 - Base de datos `sistema_facturacion` con tablas `usuarios`, `impuestos`, `categorias`, `productos`, `clientes`, `proveedores`, `facturas`, `detalles_factura`, `movimientos_inventario` y `configuraciones`.
 - **Descuentos**: por línea (monto $ con tope al valor de la línea; impuesto calculado sobre la base reducida) y descuento adicional de factura; desglose visible en el detalle de Facturas, ticket POS y PDF. El descuento total no puede dejar la venta en $0 ni en negativo (400 del backend + aviso en Caja).
 - **Módulo de configuraciones**: flags por instalación (códigos de barras, gaveta de dinero, arqueo de caja, visador) que activan o desactivan funciones opcionales en toda la interfaz; pantalla de administración exclusiva del admin (`/configuracion`).
@@ -20,7 +20,7 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 - **Autogeneración de código de producto** (`PRO-001`, `PRO-002`, ...) con precarga editable en el formulario.
 - Catálogo (categorías, impuestos, productos) y contactos (clientes, proveedores) con CRUD protegido por roles.
 - Facturación transaccional: emisión con descuento de stock y movimientos de inventario, consulta y anulación.
-- **Compras / ingreso de mercancía (solo admin)**: registro de entradas de stock con costo unitario; suma inventario, actualiza el precio de compra del producto y genera movimientos con motivo `compra` visibles en Reportes → Movimientos.
+- **Compras / ingreso de mercancía (solo admin)**: registro de entradas de stock con costo unitario obligatorio, proveedor opcional (cabecera `compras`) y escáner de código de barras (suma unidades o agrega líneas); suma inventario, actualiza el precio de compra del producto y genera movimientos con motivo `compra` visibles en Reportes → Movimientos.
 - Impresión: PDF Carta/Media carta y ticket POS térmico (58/80mm).
 - Reportes de ventas, inventario y movimientos de inventario.
 - **Frontend funcional**: Login, Dashboard con KPIs y gráficos, Caja (POS), Facturas, Productos, Catálogo, Clientes, Proveedores, Reportes y Usuarios.
@@ -64,7 +64,7 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 | GET/POST | `/api/v1/facturas` | Facturas (listar con filtros / emitir) | Token JWT |
 | GET | `/api/v1/facturas/:id` | Detalle de una factura con sus líneas | Token JWT |
 | POST | `/api/v1/facturas/:id/anular` | Anular factura y reponer stock | Token JWT (admin) |
-| POST | `/api/v1/compras` | Registrar ingreso de mercancía (`{items:[{producto_id, cantidad, costo_unitario}]}`) | Token JWT (admin) |
+| POST | `/api/v1/compras` | Registrar ingreso de mercancía (`{proveedor_id?, items:[{producto_id, cantidad, costo_unitario}]}`) | Token JWT (admin) |
 | GET | `/api/v1/facturas/:id/pdf?formato=carta\|media_carta` | Descargar PDF de la factura | Token JWT |
 | GET | `/api/v1/facturas/:id/ticket?ancho=58\|80` | Buffer de impresión térmica POS | Token JWT |
 | GET | `/api/v1/reportes/ventas?fecha_desde&fecha_hasta` | Reporte de ventas del período | Token JWT |

@@ -552,6 +552,16 @@ async function main() {
   });
   ok('Cantidad en 0 rechazada (400)', compraCantidadCero.status === 400);
 
+  const compraSinCosto = await peticion('POST', '/compras', tokenAdmin, {
+    items: [{ producto_id: idProducto1, cantidad: 1 }]
+  });
+  ok('Línea sin costo unitario rechazada (400)', compraSinCosto.status === 400);
+
+  const compraProvFantasma = await peticion('POST', '/compras', tokenAdmin, {
+    proveedor_id: 999999, items: [{ producto_id: idProducto1, cantidad: 1, costo_unitario: 2000 }]
+  });
+  ok('Proveedor inexistente rechazado (404)', compraProvFantasma.status === 404);
+
   // Stock y costos vigentes antes de la compra.
   const preCompra1 = await peticion('GET', `/productos/${idProducto1}`, tokenAdmin);
   const preCompra2 = await peticion('GET', `/productos/${idProducto2}`, tokenAdmin);
@@ -559,13 +569,16 @@ async function main() {
   const stockPre2 = preCompra2.datos.datos.stock_actual;
 
   const compra = await peticion('POST', '/compras', tokenAdmin, {
+    proveedor_id: idProveedor,
     items: [
       { producto_id: idProducto1, cantidad: 10, costo_unitario: 2000 },
       { producto_id: idProducto2, cantidad: 5, costo_unitario: 2500 }
     ]
   });
-  ok('Registrar compra con dos productos (201)',
-    compra.status === 201 && igual(compra.datos.datos.costo_total, 10 * 2000 + 5 * 2500) && compra.datos.datos.unidades === 15,
+  ok('Registrar compra con dos productos y proveedor (201)',
+    compra.status === 201 && igual(compra.datos.datos.costo_total, 10 * 2000 + 5 * 2500) &&
+    compra.datos.datos.unidades === 15 && compra.datos.datos.proveedor_id === idProveedor &&
+    Number.isInteger(compra.datos.datos.compra_id),
     `costo_total=${compra.status === 201 ? compra.datos.datos.costo_total : 'n/a'}`);
 
   const postCompra1 = await peticion('GET', `/productos/${idProducto1}`, tokenAdmin);
