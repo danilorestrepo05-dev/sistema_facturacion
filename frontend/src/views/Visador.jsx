@@ -64,7 +64,7 @@ const Visador = () => {
       {/* Encabezado: marca y hora */}
       <header className="d-flex justify-content-between align-items-center border-bottom pb-3">
         <div className="fs-2 fw-bold text-primary">
-          <i className="bi bi-storefront me-3"></i>Mi Negocio
+          <i className="bi bi-receipt-cutoff me-3"></i>Mi Negocio
         </div>
         <div className="text-secondary fs-3">{hora.toLocaleTimeString()}</div>
       </header>

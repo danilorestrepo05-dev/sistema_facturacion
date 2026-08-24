@@ -534,7 +534,54 @@ async function main() {
   const dobleAnulacion = await peticion('POST', `/facturas/${idFactura}/anular`, tokenAdmin);
   ok('Anular factura ya anulada rechazado (409)', dobleAnulacion.status === 409);
 
-  console.log('\n=== 13. Limpieza ===');
+  console.log('\n=== 13. Compras / ingreso de mercancía (Fase 7) ===');
+
+  const compraSinToken = await peticion('POST', '/compras', null, { items: [] });
+  ok('Compra sin token rechazada (401)', compraSinToken.status === 401);
+
+  const compraCajero = await peticion('POST', '/compras', tokenCajero, {
+    items: [{ producto_id: idProducto1, cantidad: 1, costo_unitario: 2000 }]
+  });
+  ok('Cajero NO puede registrar compras (403)', compraCajero.status === 403);
+
+  const compraVacia = await peticion('POST', '/compras', tokenAdmin, { items: [] });
+  ok('Compra sin productos rechazada (400)', compraVacia.status === 400);
+
+  const compraCantidadCero = await peticion('POST', '/compras', tokenAdmin, {
+    items: [{ producto_id: idProducto1, cantidad: 0, costo_unitario: 2000 }]
+  });
+  ok('Cantidad en 0 rechazada (400)', compraCantidadCero.status === 400);
+
+  // Stock y costos vigentes antes de la compra.
+  const preCompra1 = await peticion('GET', `/productos/${idProducto1}`, tokenAdmin);
+  const preCompra2 = await peticion('GET', `/productos/${idProducto2}`, tokenAdmin);
+  const stockPre1 = preCompra1.datos.datos.stock_actual;
+  const stockPre2 = preCompra2.datos.datos.stock_actual;
+
+  const compra = await peticion('POST', '/compras', tokenAdmin, {
+    items: [
+      { producto_id: idProducto1, cantidad: 10, costo_unitario: 2000 },
+      { producto_id: idProducto2, cantidad: 5, costo_unitario: 2500 }
+    ]
+  });
+  ok('Registrar compra con dos productos (201)',
+    compra.status === 201 && igual(compra.datos.datos.costo_total, 10 * 2000 + 5 * 2500) && compra.datos.datos.unidades === 15,
+    `costo_total=${compra.status === 201 ? compra.datos.datos.costo_total : 'n/a'}`);
+
+  const postCompra1 = await peticion('GET', `/productos/${idProducto1}`, tokenAdmin);
+  const postCompra2 = await peticion('GET', `/productos/${idProducto2}`, tokenAdmin);
+  ok('Stock incrementado tras la compra',
+    igual(postCompra1.datos.datos.stock_actual, stockPre1 + 10) &&
+    igual(postCompra2.datos.datos.stock_actual, stockPre2 + 5),
+    `${stockPre1}->${postCompra1.datos.datos.stock_actual} y ${stockPre2}->${postCompra2.datos.datos.stock_actual}`);
+
+  ok('Precio de compra actualizado por la línea con costo nuevo',
+    igual(postCompra1.datos.datos.precio_compra, 2000) && igual(postCompra2.datos.datos.precio_compra, 2500));
+
+  const repMovCompra = await peticion('GET', `/reportes/movimientos?${rango}&motivo=compra`, tokenAdmin);
+  ok('Reporte lista los movimientos de compra', repMovCompra.status === 200 && repMovCompra.datos.datos.detalle.length >= 2);
+
+  console.log('\n=== 14. Limpieza ===');
 
   await peticion('DELETE', `/productos/${idProducto2}`, tokenAdmin);
   await peticion('DELETE', `/productos/${idProducto1}`, tokenAdmin);

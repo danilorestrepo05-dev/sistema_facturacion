@@ -38,7 +38,7 @@ const Login = () => {
       <Card style={{ width: '100%', maxWidth: 400 }} className="shadow-sm">
         <Card.Body className="p-4">
           <div className="text-center mb-4">
-            <div className="display-6 mb-2"><i className="bi bi-storefront"></i></div>
+            <div className="display-6 mb-2"><i className="bi bi-receipt-cutoff"></i></div>
             <h4 className="fw-bold mb-1">Sistema de Facturación</h4>
             <p className="text-secondary mb-0">Inicia sesión para continuar</p>
           </div>

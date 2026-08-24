@@ -377,7 +377,6 @@ const Reportes = () => {
                         <option value="">Todos</option>
                         <option value="venta">Venta</option>
                         <option value="compra">Compra</option>
-                        <option value="ajuste">Ajuste</option>
                         <option value="anulacion">Anulación</option>
                       </Form.Select>
                     </Col>

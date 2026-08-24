@@ -11,6 +11,7 @@ import Arqueo from './views/Arqueo';
 import Facturas from './views/Facturas';
 import Productos from './views/Productos';
 import Catalogo from './views/Catalogo';
+import Compras from './views/Compras';
 import Clientes from './views/Clientes';
 import Proveedores from './views/Proveedores';
 import Reportes from './views/Reportes';
@@ -47,6 +48,14 @@ const App = () => (
         <Route path="facturas" element={<Facturas />} />
         <Route path="productos" element={<Productos />} />
         <Route path="catalogo" element={<Catalogo />} />
+        <Route
+          path="compras"
+          element={
+            <RutaAdmin>
+              <Compras />
+            </RutaAdmin>
+          }
+        />
         <Route path="clientes" element={<Clientes />} />
         <Route path="proveedores" element={<Proveedores />} />
         <Route path="reportes" element={<Reportes />} />

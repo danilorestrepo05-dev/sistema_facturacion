@@ -15,6 +15,7 @@ const backupRoutes = require('./routes/backup.routes');
 const configRoutes = require('./routes/config.routes');
 const gavetaRoutes = require('./routes/gaveta.routes');
 const turnoRoutes = require('./routes/turno.routes');
+const compraRoutes = require('./routes/compra.routes');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -62,6 +63,9 @@ app.use('/api/v1/gaveta', gavetaRoutes);
 
 // Rutas de arqueo de caja: turnos con fondo inicial y cuadre al cierre.
 app.use('/api/v1/turnos', turnoRoutes);
+
+// Rutas de compras: ingreso de mercancía al inventario (solo admin).
+app.use('/api/v1/compras', compraRoutes);
 
 // Ruta raíz informativa.
 app.get('/', (req, res) =>
