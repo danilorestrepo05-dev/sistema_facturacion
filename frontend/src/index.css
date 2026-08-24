@@ -240,6 +240,14 @@ body {
   padding-bottom: 0.25rem;
 }
 
+/* El buscador y los chips viven en una columna flexible de altura fija:
+   sin flex-shrink:0 el reparto de espacio los comprime ("aplastados")
+   cuando la ventana baja de alto. El grid ya absorbe el ajuste con su scroll. */
+.pos-busqueda,
+.caja-chips {
+  flex-shrink: 0;
+}
+
 .caja-chip {
   white-space: nowrap;
   flex: 0 0 auto;
