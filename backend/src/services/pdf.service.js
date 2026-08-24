@@ -71,7 +71,9 @@ const generarFacturaPDF = (factura, { formato = 'carta' } = {}) =>
     y += altoLinea;
 
     doc.text(`Pago: ${factura.tipo_pago}`, margen, y);
-    y += esMedia ? 6 : 10;
+    // Se avanza una línea completa (como las filas de arriba): con un salto
+    // menor el encabezado "Cant | Producto" se montaba sobre este texto.
+    y += altoLinea;
 
     // --- Tabla de detalle ---
     const colCant = 32;
