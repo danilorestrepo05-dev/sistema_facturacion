@@ -2,6 +2,7 @@
 // Lógica de reportes: ventas e inventario.
 const reporteModel = require('../models/reporte.model');
 const { jsonExito, jsonError } = require('../utils/response');
+const { leerPaginacion, enviarCabeceras } = require('../utils/paginacion');
 
 // Fecha local del servidor en formato YYYY-MM-DD (la BD guarda hora local).
 const fechaHoyLocal = () => {
@@ -101,10 +102,21 @@ const movimientos = async (req, res, next) => {
 
     const filtros = { fecha_desde, fecha_hasta, tipo, motivo };
 
-    const [resumen, detalle] = await Promise.all([
+    const paginacion = leerPaginacion(req);
+    const [resumen, detalle, total] = await Promise.all([
       reporteModel.resumenMovimientos(filtros),
-      reporteModel.movimientosDetalle(filtros)
+      reporteModel.movimientosDetalle(
+        filtros,
+        paginacion?.pagina ?? 1,
+        // Sin ?por_pagina conserva el comportamiento histórico (tope de 500 filas).
+        paginacion?.porPagina ?? 500
+      ),
+      // El total solo se consulta cuando hay paginación activa.
+      paginacion ? reporteModel.contarMovimientos(filtros) : Promise.resolve(0)
     ]);
+    if (paginacion) {
+      enviarCabeceras(res, { ...paginacion, total });
+    }
 
     return jsonExito(res, { resumen, detalle }, 'Reporte de movimientos generado');
   } catch (err) {

@@ -161,6 +161,42 @@ body {
   max-width: 320px;
 }
 
+/* Caja: scroll independiente por panel (solo escritorio, >=992px).
+   La fila del POS toma una altura fija y cada columna se desplaza por su cuenta,
+   de modo que con 30+ productos el carrito siempre queda a la vista. */
+@media (min-width: 992px) {
+  .caja-fila {
+    height: calc(100vh - 175px);
+  }
+
+  .caja-col {
+    min-height: 0;
+  }
+
+  /* Listado de productos: ocupa el espacio restante de su columna */
+  .caja-listado {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* Panel del carrito: alto completo con desplazamiento propio */
+  .caja-panel {
+    height: 100%;
+    overflow-y: auto;
+  }
+}
+
+/* Botón flotante que abre el carrito en pantallas pequeñas
+   (se oculta en escritorio con la utilidad d-lg-none) */
+.caja-boton-carrito {
+  position: fixed;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 1045;
+}
+
 /* Sección solo para impresión (oculta en pantalla) */
 .seccion-impresion {
   display: none;

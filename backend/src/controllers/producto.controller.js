@@ -2,12 +2,19 @@
 // Lógica de CRUD para productos.
 const productoModel = require('../models/producto.model');
 const { jsonExito, jsonError } = require('../utils/response');
+const { leerPaginacion, enviarCabeceras } = require('../utils/paginacion');
 
 // GET /api/v1/productos?termino=...
 const listar = async (req, res, next) => {
   try {
     const termino = String(req.query.termino || '').trim();
-    const productos = await productoModel.listar(termino);
+    const paginacion = leerPaginacion(req);
+    // Sin ?por_pagina devuelve todo el catálogo (lo necesitan los selectores de Caja/Compras).
+    const productos = await productoModel.listar(termino, paginacion?.pagina ?? 1, paginacion?.porPagina ?? 0);
+    if (paginacion) {
+      const total = await productoModel.contar(termino);
+      enviarCabeceras(res, { ...paginacion, total });
+    }
     return jsonExito(res, productos, 'Productos obtenidos');
   } catch (err) {
     return next(err);

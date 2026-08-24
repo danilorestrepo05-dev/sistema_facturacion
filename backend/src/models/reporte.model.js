@@ -121,8 +121,11 @@ const resumenMovimientos = async ({ fecha_desde, fecha_hasta }) => {
   return { ...filas[0], por_motivo };
 };
 
-// Detalle de movimientos con nombre/código de producto y factura asociada.
-const movimientosDetalle = async ({ fecha_desde, fecha_hasta, tipo, motivo }, limite = 500) => {
+// Detalle de movimientos con nombre/código de producto y documento de referencia.
+// El JOIN con facturas solo aplica a ventas/anulaciones: los movimientos por
+// compra usan referencia_id apuntando a la tabla `compras`, y cruzarlos sin
+// condición hacía que una compra #6 mostrara la "Factura #6" (falso positivo).
+const movimientosDetalle = async ({ fecha_desde, fecha_hasta, tipo, motivo }, pagina = 1, porPagina = 500) => {
   const condiciones = ['DATE(m.creado_en) BETWEEN ? AND ?'];
   const parametros = [fecha_desde, fecha_hasta];
 
@@ -135,7 +138,11 @@ const movimientosDetalle = async ({ fecha_desde, fecha_hasta, tipo, motivo }, li
     parametros.push(motivo);
   }
 
-  parametros.push(limite);
+  // La factura solo se une cuando el movimiento nace de una venta o anulación.
+  const joinFacturas =
+    "LEFT JOIN facturas f ON f.id = m.referencia_id AND m.motivo IN ('venta', 'anulacion')";
+
+  parametros.push(porPagina, (pagina - 1) * porPagina);
 
   const [filas] = await pool.query(
     `SELECT m.id, m.tipo, m.cantidad, m.motivo, m.referencia_id, m.creado_en,
@@ -143,13 +150,36 @@ const movimientosDetalle = async ({ fecha_desde, fecha_hasta, tipo, motivo }, li
             f.numero_factura
      FROM movimientos_inventario m
      LEFT JOIN productos p ON p.id = m.producto_id
-     LEFT JOIN facturas f ON f.id = m.referencia_id
+     ${joinFacturas}
      WHERE ${condiciones.join(' AND ')}
      ORDER BY m.creado_en DESC, m.id DESC
-     LIMIT ?`,
+     LIMIT ? OFFSET ?`,
     parametros
   );
   return filas;
+};
+
+// Cuenta los movimientos que cumplen los filtros (para la paginación del detalle).
+const contarMovimientos = async ({ fecha_desde, fecha_hasta, tipo, motivo }) => {
+  const condiciones = ['DATE(m.creado_en) BETWEEN ? AND ?'];
+  const parametros = [fecha_desde, fecha_hasta];
+
+  if (tipo) {
+    condiciones.push('m.tipo = ?');
+    parametros.push(tipo);
+  }
+  if (motivo) {
+    condiciones.push('m.motivo = ?');
+    parametros.push(motivo);
+  }
+
+  const [filas] = await pool.query(
+    `SELECT COUNT(*) AS total
+     FROM movimientos_inventario m
+     WHERE ${condiciones.join(' AND ')}`,
+    parametros
+  );
+  return filas[0].total;
 };
 
 // Cantidad de productos y valor por categoría.
@@ -176,5 +206,6 @@ module.exports = {
   productosBajoStock,
   productosPorCategoria,
   resumenMovimientos,
-  movimientosDetalle
+  movimientosDetalle,
+  contarMovimientos
 };

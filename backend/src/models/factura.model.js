@@ -5,7 +5,7 @@ const pool = require('../config/db');
 const TIPOS_PAGO = ['efectivo', 'tarjeta', 'transferencia', 'otro'];
 
 // Lista facturas con cliente y usuario; filtros opcionales por número, cliente, estado y rango de fecha.
-const listar = async ({ numero, cliente, estado, fecha_desde, fecha_hasta } = {}) => {
+const listar = async ({ numero, cliente, estado, fecha_desde, fecha_hasta } = {}, pagina = 1, porPagina = 0) => {
   const condiciones = [];
   const parametros = [];
 
@@ -42,8 +42,55 @@ const listar = async ({ numero, cliente, estado, fecha_desde, fecha_hasta } = {}
     ${donde}
     ORDER BY f.numero_factura DESC`;
 
-  const [filas] = await pool.query(consulta, parametros);
+  const parametrosListado = [...parametros];
+
+  // Paginación opt-in: solo se aplica cuando la vista pide por_pagina.
+  let sql = consulta;
+  if (porPagina > 0) {
+    sql += ' LIMIT ? OFFSET ?';
+    parametrosListado.push(porPagina, (pagina - 1) * porPagina);
+  }
+
+  const [filas] = await pool.query(sql, parametrosListado);
   return filas;
+};
+
+// Cuenta las facturas que cumplen los filtros (para la paginación).
+const contar = async ({ numero, cliente, estado, fecha_desde, fecha_hasta } = {}) => {
+  const condiciones = [];
+  const parametros = [];
+
+  if (numero) {
+    condiciones.push('f.numero_factura = ?');
+    parametros.push(Number(numero));
+  }
+  if (cliente) {
+    condiciones.push('c.nombre LIKE ?');
+    parametros.push(`%${cliente}%`);
+  }
+  if (estado) {
+    condiciones.push('f.estado = ?');
+    parametros.push(estado);
+  }
+  if (fecha_desde) {
+    condiciones.push('DATE(f.creado_en) >= ?');
+    parametros.push(fecha_desde);
+  }
+  if (fecha_hasta) {
+    condiciones.push('DATE(f.creado_en) <= ?');
+    parametros.push(fecha_hasta);
+  }
+
+  const donde = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
+
+  const [filas] = await pool.query(
+    `SELECT COUNT(*) AS total
+     FROM facturas f
+     LEFT JOIN clientes c ON c.id = f.cliente_id
+     ${donde}`,
+    parametros
+  );
+  return filas[0].total;
 };
 
 // Obtiene una factura con sus líneas de detalle.
@@ -265,4 +312,4 @@ const anular = async (id) => {
   }
 };
 
-module.exports = { listar, buscarPorId, crear, anular, TIPOS_PAGO };
+module.exports = { listar, contar, buscarPorId, crear, anular, TIPOS_PAGO };

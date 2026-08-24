@@ -6,6 +6,7 @@ const turnoModel = require('../models/turno.model');
 const pdfService = require('../services/pdf.service');
 const ticketService = require('../services/ticket.service');
 const { jsonExito, jsonError } = require('../utils/response');
+const { leerPaginacion, enviarCabeceras } = require('../utils/paginacion');
 
 // GET /api/v1/facturas?numero=&cliente=&estado=&fecha_desde=&fecha_hasta=
 const listar = async (req, res, next) => {
@@ -18,7 +19,13 @@ const listar = async (req, res, next) => {
       fecha_hasta: req.query.fecha_hasta
     };
 
-    const facturas = await facturaModel.listar(filtros);
+    const paginacion = leerPaginacion(req);
+    // Sin ?por_pagina devuelve todo el listado (compatibilidad con consumidores actuales).
+    const facturas = await facturaModel.listar(filtros, paginacion?.pagina ?? 1, paginacion?.porPagina ?? 0);
+    if (paginacion) {
+      const total = await facturaModel.contar(filtros);
+      enviarCabeceras(res, { ...paginacion, total });
+    }
     return jsonExito(res, facturas, 'Facturas obtenidas');
   } catch (err) {
     return next(err);

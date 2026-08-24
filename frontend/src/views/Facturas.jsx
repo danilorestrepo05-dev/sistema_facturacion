@@ -2,12 +2,13 @@
 // Consulta de facturas: filtros, detalle, impresión y anulación.
 import { useEffect, useState } from 'react';
 import {
-  Row, Col, Card, Form, Button, Table, Badge, Spinner, Alert, Modal, Pagination
+  Row, Col, Card, Form, Button, Table, Badge, Spinner, Alert, Modal
 } from 'react-bootstrap';
 import api from '../services/api';
 import { abrirTicketFactura, abrirPdfFactura } from '../services/impresion';
 import { formatoMoneda, formatoFechaHora } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
+import Paginacion from '../components/Paginacion';
 
 const POR_PAGINA = 10;
 
@@ -26,6 +27,7 @@ const Facturas = () => {
   const [fechaHasta, setFechaHasta] = useState('');
 
   const [pagina, setPagina] = useState(1);
+  const [paginas, setPaginas] = useState(0); // total de páginas (lo informa el backend)
   const [detalle, setDetalle] = useState(null); // factura a mostrar en modal
 
   useEffect(() => {
@@ -43,10 +45,15 @@ const Facturas = () => {
           cliente: cliente || undefined,
           estado: estado || undefined,
           fecha_desde: fechaDesde || undefined,
-          fecha_hasta: fechaHasta || undefined
+          fecha_hasta: fechaHasta || undefined,
+          pagina,
+          por_pagina: POR_PAGINA
         }
       });
       setFacturas(respuesta.data.datos);
+      // El total de registros llega en cabeceras: la paginación es del backend.
+      const total = Number(respuesta.headers['x-total-registros'] || 0);
+      setPaginas(Math.ceil(total / POR_PAGINA));
     } catch (err) {
       setError(err.response?.data?.mensaje || 'Error al cargar facturas');
     } finally {
@@ -85,8 +92,8 @@ const Facturas = () => {
     }
   };
 
-  const totalPaginas = Math.max(1, Math.ceil(facturas.length / POR_PAGINA));
-  const visibles = facturas.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
+  // La paginación la hace el backend: la tabla muestra directamente las filas recibidas.
+  const visibles = facturas;
 
   return (
     <div>
@@ -180,17 +187,7 @@ const Facturas = () => {
               </tbody>
             </Table>
 
-            {facturas.length > POR_PAGINA && (
-              <div className="d-flex justify-content-center mt-3">
-                <Pagination size="sm">
-                  {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((p) => (
-                    <Pagination.Item key={p} active={p === pagina} onClick={() => setPagina(p)}>
-                      {p}
-                    </Pagination.Item>
-                  ))}
-                </Pagination>
-              </div>
-            )}
+            <Paginacion pagina={pagina} paginas={paginas} onChange={setPagina} />
           </Card.Body>
         </Card>
       )}

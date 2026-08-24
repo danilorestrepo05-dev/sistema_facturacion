@@ -64,7 +64,7 @@ async function peticion(metodo, ruta, token, cuerpo) {
   const datos = tipo.includes('json')
     ? await respuesta.json()
     : await respuesta.text();
-  return { status: respuesta.status, tipo, datos };
+  return { status: respuesta.status, tipo, datos, headers: respuesta.headers };
 }
 
 let pasos = 0, fallos = 0;
@@ -597,8 +597,48 @@ async function main() {
 
   const repMovCompra = await peticion('GET', `/reportes/movimientos?${rango}&motivo=compra`, tokenAdmin);
   ok('Reporte lista los movimientos de compra', repMovCompra.status === 200 && repMovCompra.datos.datos.detalle.length >= 2);
+  ok('Los movimientos de compra ya no muestran número de factura (bug F-/C-)',
+    repMovCompra.datos.datos.detalle.every((m) => m.numero_factura === null || m.numero_factura === undefined));
 
-  console.log('\n=== 14. Limpieza ===');
+  console.log('\n=== 14. Paginación ===');
+
+  const pagProductos = await peticion('GET', '/productos?por_pagina=2&pagina=1', tokenAdmin);
+  ok('Paginación de productos: solo 2 filas y total en cabecera',
+    pagProductos.status === 200 && pagProductos.datos.datos.length === 2 &&
+    Number(pagProductos.headers.get('x-total-registros')) >= 3,
+    `total=${pagProductos.headers.get('x-total-registros')}`);
+
+  const pagProductos2 = await peticion('GET', '/productos?por_pagina=2&pagina=2', tokenAdmin);
+  ok('Página 2 de productos no repite la página 1',
+    pagProductos2.status === 200 && pagProductos2.datos.datos.length > 0 &&
+    !pagProductos2.datos.datos.some((p) => pagProductos.datos.datos.some((q) => q.id === p.id)));
+
+  const pagClientes = await peticion('GET', '/clientes?por_pagina=1&pagina=1', tokenAdmin);
+  ok('Paginación de clientes',
+    pagClientes.status === 200 && pagClientes.datos.datos.length === 1 &&
+    Number(pagClientes.headers.get('x-total-registros')) >= 1);
+
+  const pagProveedores = await peticion('GET', '/proveedores?por_pagina=10&pagina=1', tokenAdmin);
+  ok('Paginación de proveedores',
+    pagProveedores.status === 200 && pagProveedores.datos.datos.length <= 10 &&
+    Number(pagProveedores.headers.get('x-total-registros')) >= 1);
+
+  const pagFacturas = await peticion('GET', '/facturas?por_pagina=5&pagina=1', tokenCajero);
+  ok('Paginación de facturas (cajero)',
+    pagFacturas.status === 200 && pagFacturas.datos.datos.length <= 5 &&
+    Number(pagFacturas.headers.get('x-total-registros')) >= 1);
+
+  const pagMov = await peticion('GET', `/reportes/movimientos?${rango}&motivo=compra&por_pagina=1&pagina=1`, tokenAdmin);
+  ok('Paginación del detalle de movimientos',
+    pagMov.status === 200 && pagMov.datos.datos.detalle.length === 1 &&
+    Number(pagMov.headers.get('x-total-registros')) >= 2,
+    `total=${pagMov.headers.get('x-total-registros')}`);
+
+  const sinPaginar = await peticion('GET', '/productos', tokenAdmin);
+  ok('Sin por_pagina se conserva el listado completo (selectores)',
+    sinPaginar.status === 200 && sinPaginar.datos.datos.length >= 3 && !sinPaginar.headers.get('x-paginas'));
+
+  console.log('\n=== 15. Limpieza ===');
 
   await peticion('DELETE', `/productos/${idProducto2}`, tokenAdmin);
   await peticion('DELETE', `/productos/${idProducto1}`, tokenAdmin);

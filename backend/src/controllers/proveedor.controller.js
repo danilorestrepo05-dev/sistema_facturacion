@@ -2,6 +2,7 @@
 // Lógica de CRUD para proveedores.
 const proveedorModel = require('../models/proveedor.model');
 const { jsonExito, jsonError } = require('../utils/response');
+const { leerPaginacion, enviarCabeceras } = require('../utils/paginacion');
 
 const TIPOS_DOCUMENTO = ['CC', 'NIT', 'CE', 'Pasaporte', 'Otro'];
 
@@ -9,7 +10,13 @@ const TIPOS_DOCUMENTO = ['CC', 'NIT', 'CE', 'Pasaporte', 'Otro'];
 const listar = async (req, res, next) => {
   try {
     const termino = String(req.query.termino || '').trim();
-    const proveedores = await proveedorModel.listar(termino);
+    const paginacion = leerPaginacion(req);
+    // Sin ?por_pagina devuelve todos (lo necesita el selector de proveedores de Compras).
+    const proveedores = await proveedorModel.listar(termino, paginacion?.pagina ?? 1, paginacion?.porPagina ?? 0);
+    if (paginacion) {
+      const total = await proveedorModel.contar(termino);
+      enviarCabeceras(res, { ...paginacion, total });
+    }
     return jsonExito(res, proveedores, 'Proveedores obtenidos');
   } catch (err) {
     return next(err);

@@ -6,8 +6,10 @@ import {
 } from 'react-bootstrap';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import Paginacion from '../components/Paginacion';
 
 const TIPOS_DOCUMENTO = ['CC', 'NIT', 'CE', 'Pasaporte', 'Otro'];
+const POR_PAGINA = 20;
 
 const Proveedores = () => {
   const { usuario } = useAuth();
@@ -17,25 +19,35 @@ const Proveedores = () => {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [termino, setTermino] = useState('');
+  const [pagina, setPagina] = useState(1);
+  const [paginas, setPaginas] = useState(0);
 
   const [modal, setModal] = useState(false);
   const [editando, setEditando] = useState(null);
   const [form, setForm] = useState(vacio());
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { cargar(); }, [pagina]);
 
   const cargar = async (conBusqueda = false) => {
     setCargando(true);
     setError('');
     try {
-      const respuesta = await api.get('/proveedores', { params: { termino } });
+      const respuesta = await api.get('/proveedores', {
+        params: { termino, pagina, por_pagina: POR_PAGINA }
+      });
       setProveedores(respuesta.data.datos);
+      // El total de registros llega en cabeceras (la paginación es del backend).
+      const total = Number(respuesta.headers['x-total-registros'] || 0);
+      setPaginas(Math.ceil(total / POR_PAGINA));
     } catch (err) {
       setError(err.response?.data?.mensaje || 'Error al cargar proveedores');
     } finally {
       setCargando(false);
     }
-    if (conBusqueda) setTermino('');
+    if (conBusqueda) {
+      setTermino('');
+      setPagina(1); // nueva búsqueda vuelve a la primera página
+    }
   };
 
   const abrirNuevo = () => { setEditando(null); setForm(vacio()); setModal(true); };
@@ -140,6 +152,7 @@ const Proveedores = () => {
                 ))}
               </tbody>
             </Table>
+            <Paginacion pagina={pagina} paginas={paginas} onChange={setPagina} />
           </Card.Body>
         </Card>
       )}

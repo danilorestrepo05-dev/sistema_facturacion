@@ -4,7 +4,7 @@ const pool = require('../config/db');
 
 // Lista productos con el nombre de su categoría e impuesto.
 // Acepta un término de búsqueda opcional por código, nombre o categoría.
-const listar = async (termino = '') => {
+const listar = async (termino = '', pagina = 1, porPagina = 0) => {
   const consulta = `
     SELECT p.id, p.codigo, p.codigo_barras, p.nombre, p.descripcion,
            p.categoria_id, c.nombre AS categoria_nombre,
@@ -18,8 +18,29 @@ const listar = async (termino = '') => {
     ORDER BY p.nombre`;
 
   const patron = `%${termino}%`;
-  const [filas] = await pool.query(consulta, [patron, patron, patron, patron]);
+  const parametros = [patron, patron, patron, patron];
+  let sql = consulta;
+
+  // Paginación opt-in: solo se aplica cuando la vista pide por_pagina.
+  if (porPagina > 0) {
+    sql += ' LIMIT ? OFFSET ?';
+    parametros.push(porPagina, (pagina - 1) * porPagina);
+  }
+
+  const [filas] = await pool.query(sql, parametros);
   return filas;
+};
+
+// Cuenta los productos que coinciden con la búsqueda (para la paginación).
+const contar = async (termino = '') => {
+  const patron = `%${termino}%`;
+  const [filas] = await pool.query(
+    `SELECT COUNT(*) AS total FROM productos p
+     LEFT JOIN categorias c ON c.id = p.categoria_id
+     WHERE (p.codigo LIKE ? OR p.codigo_barras LIKE ? OR p.nombre LIKE ? OR c.nombre LIKE ?)`,
+    [patron, patron, patron, patron]
+  );
+  return filas[0].total;
 };
 
 // Busca un producto por su id con datos de categoría e impuesto.
@@ -115,4 +136,4 @@ const siguienteCodigo = async () => {
   return `${PREFIJO_CODIGO}${String(maximo + 1).padStart(3, '0')}`;
 };
 
-module.exports = { listar, buscarPorId, buscarPorCodigoBarras, crear, actualizar, eliminar, siguienteCodigo };
+module.exports = { listar, contar, buscarPorId, buscarPorCodigoBarras, crear, actualizar, eliminar, siguienteCodigo };

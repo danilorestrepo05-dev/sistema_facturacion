@@ -7,6 +7,9 @@ import {
 import api from '../services/api';
 import { formatoMoneda } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
+import Paginacion from '../components/Paginacion';
+
+const POR_PAGINA = 20;
 
 const Productos = () => {
   const { usuario } = useAuth();
@@ -18,6 +21,8 @@ const Productos = () => {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [termino, setTermino] = useState('');
+  const [pagina, setPagina] = useState(1);
+  const [paginas, setPaginas] = useState(0);
 
   const [modal, setModal] = useState(false);
   const [editando, setEditando] = useState(null); // null = crear
@@ -31,7 +36,7 @@ const Productos = () => {
 
   useEffect(() => {
     cargar();
-  }, []);
+  }, [pagina]);
 
   // Cámara: abre el lector de ZXing sobre el video del modal (importación
   // perezosa, solo se carga si se usa). Se detiene tras el primer código leído.
@@ -84,11 +89,14 @@ const Productos = () => {
     setError('');
     try {
       const [respProductos, respCategorias, respImpuestos] = await Promise.all([
-        api.get('/productos', { params: { termino } }),
+        api.get('/productos', { params: { termino, pagina, por_pagina: POR_PAGINA } }),
         api.get('/categorias'),
         api.get('/impuestos')
       ]);
       setProductos(respProductos.data.datos);
+      // El total de registros llega en cabeceras (la paginación es del backend).
+      const total = Number(respProductos.headers['x-total-registros'] || 0);
+      setPaginas(Math.ceil(total / POR_PAGINA));
       setCategorias(respCategorias.data.datos);
       setImpuestos(respImpuestos.data.datos);
     } catch (err) {
@@ -192,6 +200,7 @@ const Productos = () => {
 
   const busqueda = (e) => {
     e.preventDefault();
+    setPagina(1); // nueva búsqueda vuelve a la primera página
     cargar();
   };
 
@@ -265,6 +274,7 @@ const Productos = () => {
                 ))}
               </tbody>
             </Table>
+            <Paginacion pagina={pagina} paginas={paginas} onChange={setPagina} />
           </Card.Body>
         </Card>
       )}

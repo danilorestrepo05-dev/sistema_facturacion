@@ -8,8 +8,10 @@ import {
 } from 'recharts';
 import api from '../services/api';
 import { formatoMoneda, formatoFechaHora, fechaHoyLocal } from '../utils/format';
+import Paginacion from '../components/Paginacion';
 
 const COLORS = ['#5d3fd3', '#0dcaf0', '#198754', '#fd7e14', '#dc3545', '#6f42c1'];
+const POR_PAGINA_MOV = 50; // filas por página en el detalle de movimientos
 
 const Reportes = () => {
   const [tabActiva, setTabActiva] = useState('ventas');
@@ -22,6 +24,8 @@ const Reportes = () => {
   const [movimientos, setMovimientos] = useState(null);
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroMotivo, setFiltroMotivo] = useState('');
+  const [paginaMov, setPaginaMov] = useState(1);
+  const [paginasMov, setPaginasMov] = useState(0);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
 
@@ -72,12 +76,8 @@ const Reportes = () => {
     }
   };
 
-  const cargarMovimientos = async (e) => {
-    e?.preventDefault();
-    if (fechaDesde > fechaHasta) {
-      setError('La fecha desde no puede ser mayor que la fecha hasta');
-      return;
-    }
+  // Consulta el detalle de movimientos en la página indicada (paginación backend).
+  const consultarMovimientos = async (pagina) => {
     setCargando(true);
     setError('');
     try {
@@ -85,15 +85,34 @@ const Reportes = () => {
         fecha_desde: fechaDesde,
         fecha_hasta: fechaHasta,
         tipo: filtroTipo || undefined,
-        motivo: filtroMotivo || undefined
+        motivo: filtroMotivo || undefined,
+        pagina,
+        por_pagina: POR_PAGINA_MOV
       };
       const respuesta = await api.get('/reportes/movimientos', { params });
       setMovimientos(respuesta.data.datos);
+      const total = Number(respuesta.headers['x-total-registros'] || 0);
+      setPaginasMov(Math.ceil(total / POR_PAGINA_MOV));
     } catch (err) {
       setError(err.response?.data?.mensaje || 'Error al generar el reporte de movimientos');
     } finally {
       setCargando(false);
     }
+  };
+
+  const cargarMovimientos = async (e) => {
+    e?.preventDefault();
+    if (fechaDesde > fechaHasta) {
+      setError('La fecha desde no puede ser mayor que la fecha hasta');
+      return;
+    }
+    setPaginaMov(1); // cada nueva consulta vuelve a la primera página
+    await consultarMovimientos(1);
+  };
+
+  const cambiarPaginaMov = (nueva) => {
+    setPaginaMov(nueva);
+    consultarMovimientos(nueva);
   };
 
   useEffect(() => { cargarInventario(); }, []);
@@ -462,7 +481,7 @@ const Reportes = () => {
                       <thead>
                         <tr>
                           <th>Fecha</th><th>Producto</th><th>Tipo</th>
-                          <th className="text-end">Cantidad</th><th>Motivo</th><th className="text-end">Factura</th>
+                          <th className="text-end">Cantidad</th><th>Motivo</th><th className="text-end">Referencia</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -479,11 +498,17 @@ const Reportes = () => {
                             <td className={`text-end ${m.tipo === 'entrada' ? 'text-success' : 'text-danger'}`}>
                               {m.tipo === 'entrada' ? '+' : '-'}{m.cantidad} {m.unidad_medida || ''}
                             </td>                            <td className="text-capitalize">{m.motivo}</td>
-                            <td className="text-end">{m.numero_factura ? `#${m.numero_factura}` : '—'}</td>
+                            {/* Referencia: F- para facturas (venta/anulación), C- para compras */}
+                            <td className="text-end">
+                              {m.motivo === 'compra'
+                                ? `C-${m.referencia_id}`
+                                : m.numero_factura ? `F-${m.numero_factura}` : '—'}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </Table>
+                    <Paginacion pagina={paginaMov} paginas={paginasMov} onChange={cambiarPaginaMov} />
                   </Card.Body>
                 </Card>
               </>
@@ -696,7 +721,7 @@ const Reportes = () => {
                   <thead>
                     <tr>
                       <th>Fecha</th><th>Producto</th><th>Tipo</th>
-                      <th className="text-end">Cantidad</th><th>Motivo</th><th className="text-end">Factura</th>
+                      <th className="text-end">Cantidad</th><th>Motivo</th><th className="text-end">Referencia</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -707,7 +732,12 @@ const Reportes = () => {
                         <td className="text-capitalize">{m.tipo}</td>
                         <td className="text-end">{m.tipo === 'entrada' ? '+' : '-'}{m.cantidad} {m.unidad_medida || ''}</td>
                         <td className="text-capitalize">{m.motivo}</td>
-                        <td className="text-end">{m.numero_factura ? `#${m.numero_factura}` : '—'}</td>
+                        {/* Referencia: F- para facturas (venta/anulación), C- para compras */}
+                        <td className="text-end">
+                          {m.motivo === 'compra'
+                            ? `C-${m.referencia_id}`
+                            : m.numero_factura ? `F-${m.numero_factura}` : '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

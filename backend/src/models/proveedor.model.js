@@ -3,7 +3,7 @@
 const pool = require('../config/db');
 
 // Lista proveedores; acepta un término opcional para buscar por nombre, documento, teléfono o tipo de item.
-const listar = async (termino = '') => {
+const listar = async (termino = '', pagina = 1, porPagina = 0) => {
   const consulta = `
     SELECT id, nombre, tipo_documento, documento, telefono, email, direccion,
            tipo_item, activo, creado_en, actualizado_en
@@ -12,8 +12,28 @@ const listar = async (termino = '') => {
     ORDER BY nombre`;
 
   const patron = `%${termino}%`;
-  const [filas] = await pool.query(consulta, [patron, patron, patron, patron]);
+  const parametros = [patron, patron, patron, patron];
+  let sql = consulta;
+
+  // Paginación opt-in: solo se aplica cuando la vista pide por_pagina.
+  if (porPagina > 0) {
+    sql += ' LIMIT ? OFFSET ?';
+    parametros.push(porPagina, (pagina - 1) * porPagina);
+  }
+
+  const [filas] = await pool.query(sql, parametros);
   return filas;
+};
+
+// Cuenta los proveedores que coinciden con la búsqueda (para la paginación).
+const contar = async (termino = '') => {
+  const patron = `%${termino}%`;
+  const [filas] = await pool.query(
+    `SELECT COUNT(*) AS total FROM proveedores
+     WHERE (nombre LIKE ? OR documento LIKE ? OR telefono LIKE ? OR tipo_item LIKE ?)`,
+    [patron, patron, patron, patron]
+  );
+  return filas[0].total;
 };
 
 // Busca un proveedor por su id.
@@ -54,4 +74,4 @@ const eliminar = async (id) => {
   return resultado.affectedRows > 0;
 };
 
-module.exports = { listar, buscarPorId, crear, actualizar, eliminar };
+module.exports = { listar, contar, buscarPorId, crear, actualizar, eliminar };
