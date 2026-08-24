@@ -254,114 +254,132 @@ const Caja = () => {
     }
   };
 
-  // Tarjeta "Venta actual": se reutiliza en el panel derecho (escritorio)
-  // y dentro del panel deslizante del carrito (móvil).
-  const tarjetaVenta = (
-    <Card className="card-kpi">
-      <Card.Body>
-        <Card.Title className="fs-6">Venta actual</Card.Title>
+  // Carrito "Venta actual" dividido en dos zonas reutilizables:
+  // - contenidoVenta: título y lista de ítems (lo único que scrollea en escritorio).
+  // - pieVenta: cliente, pago, descuento, totales y Cobrar (siempre visible).
+  // La tarjeta compuesta sirve igual para el panel derecho y el panel deslizante
+  // del móvil; es el CSS quien acota las alturas solo en escritorio.
+  const contenidoVenta = (
+    <>
+      <Card.Title className="fs-6">Venta actual</Card.Title>
 
-        <ListGroup variant="flush" className="mb-3">
-          {carrito.length === 0 && (
-            <ListGroup.Item className="text-secondary small border-0">
-              Agrega productos para iniciar la venta.
-            </ListGroup.Item>
-          )}
-          {carrito.map((item) => (
-            <ListGroup.Item key={item.producto_id} className="px-0">
-              <div className="d-flex justify-content-between align-items-start">
-                <div className="me-2">
-                  <div className="fw-semibold small">{item.nombre}</div>
-                  <div className="text-secondary small">
-                    {formatoMoneda(item.precio)} × {item.cantidad} (IVA {item.impuesto_porcentaje}%)
-                  </div>
-                </div>
-                <div className="d-flex align-items-center gap-2">
-                  <strong className="small">{formatoMoneda(item.precio * item.cantidad - (Number(item.descuento) || 0))}</strong>
-                  <Button size="sm" variant="outline-danger" onClick={() => quitar(item.producto_id)}>
-                    <i className="bi bi-trash"></i>
-                  </Button>
-                </div>
-              </div>
-              <div className="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                <span className="small text-secondary">Cantidad:</span>
-                <Form.Control
-                  type="number" size="sm" min={1} style={{ width: 90 }}
-                  value={item.cantidad}
-                  onChange={(e) => cambiarCantidad(item.producto_id, e.target.value)}
-                  onWheel={(e) => e.currentTarget.blur()}
-                />
-                <span className="small text-secondary ms-2">Descuento $:</span>
-                <CampoDescuento item={item} onCambiar={cambiarDescuento} />
-              </div>
-            </ListGroup.Item>
-          ))}
-        </ListGroup>
-
-        <Row className="g-2 mb-3">
-          <Col sm={6}>
-            <Form.Label className="small">Cliente</Form.Label>
-            <Form.Select size="sm" value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
-              <option value="">Consumidor final</option>
-              {clientes.filter((c) => c.activo === 1).map((c) => (
-                <option key={c.id} value={c.id}>{c.nombre}</option>
-              ))}
-            </Form.Select>
-          </Col>
-          <Col sm={6}>
-            <Form.Label className="small">Tipo de pago</Form.Label>
-            <Form.Select size="sm" value={tipoPago} onChange={(e) => setTipoPago(e.target.value)}>
-              {TIPOS_PAGO.map((t) => <option key={t} value={t}>{t}</option>)}
-            </Form.Select>
-          </Col>
-        </Row>
-
-        <InputGroup size="sm" className="mb-2">
-          <InputGroup.Text>Descuento adicional $</InputGroup.Text>
-          <Form.Control type="number" min={0} value={descuento}
-            onChange={(e) => setDescuento(e.target.value)}
-            onWheel={(e) => e.currentTarget.blur()} />
-        </InputGroup>
-        {ventaSinSaldo && (
-          <Alert variant="danger" className="py-2 small mb-3">
-            El descuento no puede superar ni igualar el valor de la venta.
-          </Alert>
+      <ListGroup variant="flush" className="mb-3">
+        {carrito.length === 0 && (
+          <ListGroup.Item className="text-secondary small border-0">
+            Agrega productos para iniciar la venta.
+          </ListGroup.Item>
         )}
+        {carrito.map((item) => (
+          <ListGroup.Item key={item.producto_id} className="px-0">
+            <div className="d-flex justify-content-between align-items-start">
+              <div className="me-2">
+                <div className="fw-semibold small">{item.nombre}</div>
+                <div className="text-secondary small">
+                  {formatoMoneda(item.precio)} × {item.cantidad} (IVA {item.impuesto_porcentaje}%)
+                </div>
+              </div>
+              <div className="d-flex align-items-center gap-2">
+                <strong className="small">{formatoMoneda(item.precio * item.cantidad - (Number(item.descuento) || 0))}</strong>
+                <Button size="sm" variant="outline-danger" onClick={() => quitar(item.producto_id)}>
+                  <i className="bi bi-trash"></i>
+                </Button>
+              </div>
+            </div>
+            <div className="d-flex align-items-center gap-2 mt-1 flex-wrap">
+              <span className="small text-secondary">Cantidad:</span>
+              <Form.Control
+                type="number" size="sm" min={1} style={{ width: 90 }}
+                value={item.cantidad}
+                onChange={(e) => cambiarCantidad(item.producto_id, e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
+              />
+              <span className="small text-secondary ms-2">Descuento $:</span>
+              <CampoDescuento item={item} onCambiar={cambiarDescuento} />
+            </div>
+          </ListGroup.Item>
+        ))}
+      </ListGroup>
+    </>
+  );
 
-        <div className="border-top pt-2">
-          <FilaTotal etiqueta="Subtotal" valor={formatoMoneda(totales.subtotal)} />
-          <FilaTotal etiqueta="Impuestos" valor={formatoMoneda(totales.impuesto)} />
-          {totales.descuento > 0 &&
-            <FilaTotal etiqueta="Descuento" valor={`- ${formatoMoneda(totales.descuento)}`} />}
-          <div className="d-flex justify-content-between align-items-center mt-2">
-            <span className="fw-bold fs-5">TOTAL</span>
-            <span className="fw-bold fs-5 text-primary">{formatoMoneda(totales.total)}</span>
-          </div>
+  // Pie fijo de la venta, compactado para robar poco espacio vertical:
+  // los totales van resumidos en una sola línea en lugar de tres filas.
+  const pieVenta = (
+    <>
+      <Row className="g-2 mb-2">
+        <Col sm={6}>
+          <Form.Label className="small">Cliente</Form.Label>
+          <Form.Select size="sm" value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
+            <option value="">Consumidor final</option>
+            {clientes.filter((c) => c.activo === 1).map((c) => (
+              <option key={c.id} value={c.id}>{c.nombre}</option>
+            ))}
+          </Form.Select>
+        </Col>
+        <Col sm={6}>
+          <Form.Label className="small">Tipo de pago</Form.Label>
+          <Form.Select size="sm" value={tipoPago} onChange={(e) => setTipoPago(e.target.value)}>
+            {TIPOS_PAGO.map((t) => <option key={t} value={t}>{t}</option>)}
+          </Form.Select>
+        </Col>
+      </Row>
+
+      <InputGroup size="sm" className="mb-2">
+        <InputGroup.Text>Descuento adicional $</InputGroup.Text>
+        <Form.Control type="number" min={0} value={descuento}
+          onChange={(e) => setDescuento(e.target.value)}
+          onWheel={(e) => e.currentTarget.blur()} />
+      </InputGroup>
+      {ventaSinSaldo && (
+        <Alert variant="danger" className="py-2 small mb-2">
+          El descuento no puede superar ni igualar el valor de la venta.
+        </Alert>
+      )}
+
+      {/* Resumen de totales en una sola línea + TOTAL destacado */}
+      <div className="border-top pt-2">
+        <div className="small text-secondary">
+          Subtotal {formatoMoneda(totales.subtotal)} · IVA {formatoMoneda(totales.impuesto)}
+          {totales.descuento > 0 && <> · Descuento -{formatoMoneda(totales.descuento)}</>}
         </div>
+        <div className="d-flex justify-content-between align-items-center mt-1">
+          <span className="fw-bold fs-5">TOTAL</span>
+          <span className="fw-bold fs-5 text-primary">{formatoMoneda(totales.total)}</span>
+        </div>
+      </div>
 
-        <Button variant="success" className="w-100 mt-3" size="lg"
-          disabled={carrito.length === 0 || guardando || ventaSinSaldo || ventaBloqueadaPorTurno}
-          onClick={emitir}>
-          {guardando ? 'Emitiendo…' : <><i className="bi bi-receipt me-2"></i>Cobrar y emitir factura</>}
-        </Button>
+      <Button variant="success" className="w-100 mt-2" size="lg"
+        disabled={carrito.length === 0 || guardando || ventaSinSaldo || ventaBloqueadaPorTurno}
+        onClick={emitir}>
+        {guardando ? 'Emitiendo…' : <><i className="bi bi-receipt me-2"></i>Cobrar y emitir factura</>}
+      </Button>
 
-        {/* Apertura manual de la gaveta (solo si el flag está activo) */}
-        {gavetaActiva && (
-          <>
-            {mensajeGaveta && (
-              <Alert variant="info" className="py-2 small mt-2 mb-0"
-                dismissible onClose={() => setMensajeGaveta('')}>
-                <i className="bi bi-cash-stack me-1"></i>{mensajeGaveta}
-              </Alert>
-            )}
-            <Button variant="outline-secondary" className="w-100 mt-2"
-              title="Envía el pulso a la gaveta a través de la impresora térmica"
-              onClick={abrirGaveta}>
-              <i className="bi bi-box-arrow-in-up me-2"></i>Abrir gaveta
-            </Button>
-          </>
-        )}
-      </Card.Body>
+      {/* Apertura manual de la gaveta (solo si el flag está activo) */}
+      {gavetaActiva && (
+        <>
+          {mensajeGaveta && (
+            <Alert variant="info" className="py-2 small mt-2 mb-0"
+              dismissible onClose={() => setMensajeGaveta('')}>
+              <i className="bi bi-cash-stack me-1"></i>{mensajeGaveta}
+            </Alert>
+          )}
+          <Button variant="outline-secondary" className="w-100 mt-2"
+            title="Envía el pulso a la gaveta a través de la impresora térmica"
+            onClick={abrirGaveta}>
+            <i className="bi bi-box-arrow-in-up me-2"></i>Abrir gaveta
+          </Button>
+        </>
+      )}
+    </>
+  );
+
+  // Tarjeta compuesta: en escritorio el CSS parte estas dos zonas (la lista
+  // scrollea con su propio scroll y el pie queda clavado abajo); en móvil
+  // ambas fluyen de forma natural dentro del panel deslizante.
+  const tarjetaVenta = (
+    <Card className="card-kpi caja-tarjeta-venta">
+      <div className="caja-panel-lista p-3 pb-2">{contenidoVenta}</div>
+      <div className="caja-panel-pie px-3 pb-3">{pieVenta}</div>
     </Card>
   );
 
@@ -533,13 +551,6 @@ const Caja = () => {
     </div>
   );
 };
-
-const FilaTotal = ({ etiqueta, valor }) => (
-  <div className="d-flex justify-content-between small text-secondary py-1">
-    <span>{etiqueta}</span>
-    <span>{valor}</span>
-  </div>
-);
 
 // Input de descuento por línea con borrador local: mientras el usuario teclea
 // el valor vive aquí (permite borrar y escribir sin que se reescriba un "0");

@@ -160,10 +160,6 @@ body {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
 }
 
-.pos-busqueda {
-  max-width: 320px;
-}
-
 /* Caja: scroll independiente por panel (solo escritorio, >=992px).
    La vista llena el alto disponible de app-main (sin cálculos fijos, así los
    avisos de turno no rompen la distribución) y cada columna se desplaza por
@@ -228,8 +224,34 @@ body {
   .caja-panel {
     flex: 1 1 auto;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Dentro del panel solo scrollea la lista de ítems; el pie con cliente,
+     tipo de pago, descuento, totales y Cobrar queda siempre visible. */
+  html.pos-activo .caja-panel .caja-tarjeta-venta {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  html.pos-activo .caja-panel .caja-panel-lista {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
   }
+
+  html.pos-activo .caja-panel .caja-panel-pie {
+    flex: 0 0 auto;
+  }
+}
+
+/* La tarjeta de venta se apila en dos zonas (lista + pie). En escritorio el
+   bloque anterior acota las alturas; en móvil fluyen de forma natural. */
+.caja-tarjeta-venta {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Select de categorías dentro del buscador del POS: ancho fijo para que
@@ -238,7 +260,7 @@ body {
    para hijos de .input-group. */
 .pos-busqueda .caja-select-categoria {
   flex: 0 0 auto;
-  width: 190px;
+  width: 150px;
 }
 
 /* El buscador vive en una columna flexible de altura fija:
@@ -262,8 +284,8 @@ html.pos-activo * {
 }
 
 html.pos-activo *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 html.pos-activo *::-webkit-scrollbar-track {
@@ -272,7 +294,7 @@ html.pos-activo *::-webkit-scrollbar-track {
 
 html.pos-activo *::-webkit-scrollbar-thumb {
   background: rgba(108, 117, 125, 0.35);
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 html.pos-activo *::-webkit-scrollbar-thumb:hover,
