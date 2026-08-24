@@ -1,8 +1,8 @@
 // src/views/Productos.jsx
 // Gestión de productos: listado, búsqueda y CRUD con modal.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  Row, Col, Card, Form, Button, Table, Badge, Spinner, Alert, Modal
+  Row, Col, Card, Form, Button, Table, Badge, Spinner, Alert, Modal, InputGroup
 } from 'react-bootstrap';
 import api from '../services/api';
 import { formatoMoneda } from '../utils/format';
@@ -23,9 +23,53 @@ const Productos = () => {
   const [editando, setEditando] = useState(null); // null = crear
   const [form, setForm] = useState(vacio());
 
+  // Escaneo del código de barras con la cámara (mismo patrón de Caja/Compras):
+  // llena el campo del formulario sin enviarlo.
+  const videoRef = useRef(null);
+  const [camaraAbierta, setCamaraAbierta] = useState(false);
+  const [avisoCamara, setAvisoCamara] = useState('');
+
   useEffect(() => {
     cargar();
   }, []);
+
+  // Cámara: abre el lector de ZXing sobre el video del modal (importación
+  // perezosa, solo se carga si se usa). Se detiene tras el primer código leído.
+  useEffect(() => {
+    if (!camaraAbierta) return;
+    let cancelado = false;
+    let controles = null;
+
+    (async () => {
+      try {
+        const { BrowserMultiFormatReader } = await import('@zxing/browser');
+        const lector = new BrowserMultiFormatReader();
+        controles = await lector.decodeFromVideoDevice(undefined, videoRef.current, (resultado, err, ctrl) => {
+          if (resultado && !cancelado) {
+            // Llena el campo del formulario con el código leído.
+            setForm((prev) => ({ ...prev, codigo_barras: resultado.getText() }));
+            setAvisoCamara('');
+            setCamaraAbierta(false);
+            ctrl?.stop();
+          }
+        });
+      } catch {
+        setAvisoCamara('No se pudo abrir la cámara. Recuerda que exige HTTPS o localhost.');
+        setCamaraAbierta(false);
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+      try { controles?.stop(); } catch { /* ya detenido */ }
+    };
+  }, [camaraAbierta]);
+
+  // La pistola USB escribe el código y envía Enter; se captura para que no
+  // envíe el formulario del producto por accidente.
+  const teclaCodigoBarras = (e) => {
+    if (e.key === 'Enter') e.preventDefault();
+  };
 
   const cargar = async () => {
     setCargando(true);
@@ -238,10 +282,20 @@ const Productos = () => {
               </Col>
               <Col md={4}>
                 <Form.Label>Código de barras</Form.Label>
-                <Form.Control value={form.codigo_barras}
-                  placeholder="EAN, Code128…"
-                  onChange={(e) => setForm({ ...form, codigo_barras: e.target.value })} />
+                <InputGroup>
+                  <Form.Control value={form.codigo_barras}
+                    placeholder="EAN, Code128…"
+                    onChange={(e) => setForm({ ...form, codigo_barras: e.target.value })}
+                    onKeyDown={teclaCodigoBarras} />
+                  <Button variant="outline-primary" type="button" title="Escanear con la cámara"
+                    onClick={() => setCamaraAbierta(true)}>
+                    <i className="bi bi-camera"></i>
+                  </Button>
+                </InputGroup>
                 <Form.Text className="text-muted">Opcional. Para el escáner en Caja.</Form.Text>
+                {avisoCamara && (
+                  <Alert variant="warning" className="py-2 small mt-2 mb-0">{avisoCamara}</Alert>
+                )}
               </Col>
               <Col md={12}>
                 <Form.Label>Descripción</Form.Label>
@@ -307,6 +361,16 @@ const Productos = () => {
             <Button type="submit" variant="primary">Guardar</Button>
           </Modal.Footer>
         </Form>
+      </Modal>
+
+      {/* Modal de escaneo con cámara para el código de barras (móvil o PC) */}
+      <Modal show={camaraAbierta} onHide={() => setCamaraAbierta(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="fs-6">Apunta la cámara al código de barras</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-0">
+          <video ref={videoRef} style={{ width: '100%', display: 'block', borderRadius: '0 0 6px 6px' }} muted />
+        </Modal.Body>
       </Modal>
     </div>
   );
