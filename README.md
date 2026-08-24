@@ -1,6 +1,6 @@
 # Sistema de Facturación e Inventario
 
-> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.29. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
+> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.30. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
 
 Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Monorepo Full-Stack JS). Diseñado de forma genérica para que pueda adaptarse a cualquier modelo de negocio (tienda, peluquería, droguería, restaurante, etc.) cambiando únicamente registros de la base de datos y variables de entorno.
 
@@ -20,7 +20,7 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 - **Autogeneración de código de producto** (`PRO-001`, `PRO-002`, ...) con precarga editable en el formulario.
 - Catálogo (categorías, impuestos, productos) y contactos (clientes, proveedores) con CRUD protegido por roles.
 - Facturación transaccional: emisión con descuento de stock y movimientos de inventario, consulta y anulación.
-- **Compras / ingreso de mercancía (solo admin)**: registro de entradas de stock con costo unitario obligatorio, proveedor opcional (cabecera `compras`) y escáner de código de barras (suma unidades o agrega líneas); suma inventario, actualiza el precio de compra del producto y genera movimientos con motivo `compra` visibles en Reportes → Movimientos.
+- **Compras / ingreso de mercancía (solo admin)**: registro de entradas de stock con costo unitario obligatorio, proveedor opcional (cabecera `compras`) y escáner de código de barras (pistola o cámara, precarga el último costo conocido); suma inventario, actualiza el precio de compra del producto y genera movimientos con motivo `compra` visibles en Reportes → Movimientos. El precio de compra es opcional al crear un producto: se aprende con la primera compra.
 - Impresión: PDF Carta/Media carta y ticket POS térmico (58/80mm).
 - Reportes de ventas, inventario y movimientos de inventario.
 - **Frontend funcional**: Login, Dashboard con KPIs y gráficos, Caja (POS), Facturas, Productos, Catálogo, Clientes, Proveedores, Reportes y Usuarios.

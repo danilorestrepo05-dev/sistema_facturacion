@@ -71,6 +71,14 @@ const Productos = () => {
     if (e.key === 'Enter') e.preventDefault();
   };
 
+  // Margen sobre costo en vivo: solo cuando hay costo y precio de venta > 0.
+  const margen = (() => {
+    const compra = Number(form.precio_compra);
+    const venta = Number(form.precio_venta);
+    if (!compra || !venta) return null;
+    return ((venta - compra) / compra) * 100;
+  })();
+
   const cargar = async () => {
     setCargando(true);
     setError('');
@@ -326,14 +334,22 @@ const Productos = () => {
                 </Form.Select>
               </Col>
               <Col md={3}>
-                <Form.Label>Precio compra</Form.Label>
-                <Form.Control type="number" min={0} step="0.01" required value={form.precio_compra}
+                <Form.Label>Precio compra (opcional)</Form.Label>
+                <Form.Control type="number" min={0} step="0.01" value={form.precio_compra}
                   onChange={(e) => setForm({ ...form, precio_compra: e.target.value })} />
+                <Form.Text className="text-muted">
+                  Déjalo en 0 si aún no lo has comprado; se actualiza solo con cada registro en Compras.
+                </Form.Text>
               </Col>
               <Col md={3}>
                 <Form.Label>Precio venta *</Form.Label>
                 <Form.Control type="number" min={0} step="0.01" required value={form.precio_venta}
                   onChange={(e) => setForm({ ...form, precio_venta: e.target.value })} />
+                {margen !== null && (
+                  <Form.Text className={margen < 0 ? 'text-danger' : 'text-success'}>
+                    Margen sobre costo: {margen.toFixed(1)}%
+                  </Form.Text>
+                )}
               </Col>
               <Col md={2}>
                 <Form.Label>Stock</Form.Label>

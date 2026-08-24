@@ -57,9 +57,25 @@ const Compras = () => {
     cargar();
   }, []);
 
-  // Actualiza un campo de una línea del formulario.
+  // Último costo conocido de un producto (0 si aún no tiene).
+  const costoConocido = (productoId) => {
+    const producto = productos.find((p) => p.id === Number(productoId));
+    return producto && Number(producto.precio_compra) > 0 ? String(producto.precio_compra) : '';
+  };
+
+  // Al elegir un producto manualmente, precarga su último costo conocido
+  // si el campo costo todavía está vacío.
   const cambiarLinea = (indice, campo, valor) => {
-    setLineas((prev) => prev.map((l, i) => (i === indice ? { ...l, [campo]: valor } : l)));
+    setLineas((prev) =>
+      prev.map((l, i) => {
+        if (i !== indice) return l;
+        if (campo === 'producto_id') {
+          const costoPrecarga = !l.costo_unitario && valor ? costoConocido(valor) : l.costo_unitario;
+          return { ...l, producto_id: valor, costo_unitario: costoPrecarga };
+        }
+        return { ...l, [campo]: valor };
+      })
+    );
   };
 
   const agregarLinea = () => setLineas((prev) => [...prev, filaVacia()]);
@@ -84,11 +100,18 @@ const Compras = () => {
             i === indice ? { ...l, cantidad: String(Number(l.cantidad || 0) + 1) } : l
           );
         }
-        // Si hay una línea vacía, úsala; si no, agrega una nueva.
+        // Si hay una línea vacía, úsala; si no, agrega una nueva. En ambos
+        // casos precarga el último costo conocido solo si el campo estaba vacío.
         const vacia = prev.findIndex((l) => !l.producto_id);
-        const nueva = { producto_id: String(producto.id), cantidad: '1', costo_unitario: '' };
-        if (vacia >= 0) return prev.map((l, i) => (i === vacia ? nueva : l));
-        return [...prev, nueva];
+        const costo = Number(producto.precio_compra) > 0 ? String(producto.precio_compra) : '';
+        if (vacia >= 0) {
+          return prev.map((l, i) =>
+            i === vacia
+              ? { ...l, producto_id: String(producto.id), cantidad: l.cantidad || '1', costo_unitario: l.costo_unitario || costo }
+              : l
+          );
+        }
+        return [...prev, { producto_id: String(producto.id), cantidad: '1', costo_unitario: costo }];
       });
 
       setCodigoEscaneado('');
@@ -263,6 +286,9 @@ const Compras = () => {
                   Unidades: <strong>{exito.unidades}</strong> · Costo total:{' '}
                   <strong>{formatoMoneda(exito.costo_total)}</strong>
                 </div>
+                <div className="small mt-1 fst-italic">
+                  Si cambió el costo de algún producto, revisa su precio de venta en Productos.
+                </div>
               </Alert>
             )}
 
@@ -331,6 +357,18 @@ const Compras = () => {
                       <i className="bi bi-x-lg"></i>
                     </Button>
                   </Col>
+                  {/* Precio de venta vigente del producto elegido (si aplica) */}
+                  {(() => {
+                    const producto = productos.find((p) => p.id === Number(linea.producto_id));
+                    if (!producto || !Number(producto.precio_venta)) return null;
+                    return (
+                      <Col xs={12}>
+                        <Form.Text muted>
+                          P. venta actual: {formatoMoneda(producto.precio_venta)}
+                        </Form.Text>
+                      </Col>
+                    );
+                  })()}
                 </Row>
               ))}
 
