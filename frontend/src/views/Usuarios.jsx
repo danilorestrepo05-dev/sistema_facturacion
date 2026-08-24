@@ -6,33 +6,47 @@ import {
 } from 'react-bootstrap';
 import api from '../services/api';
 import { formatoFechaHora } from '../utils/format';
+import Paginacion from '../components/Paginacion';
 
 const ROLES = ['admin', 'cajero'];
+const POR_PAGINA = 20;
 
 const Usuarios = () => {
   const [usuarios, setUsuarios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [termino, setTermino] = useState('');
+  const [pagina, setPagina] = useState(1);
+  const [paginas, setPaginas] = useState(0);
 
   const [modal, setModal] = useState(false);
   const [editando, setEditando] = useState(null); // null = crear
   const [form, setForm] = useState(vacio());
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { cargar(); }, [pagina]);
 
-  const cargar = async (conBusqueda = false) => {
+  const cargar = async () => {
     setCargando(true);
     setError('');
     try {
-      const respuesta = await api.get('/usuarios', { params: { termino } });
+      const respuesta = await api.get('/usuarios', {
+        params: { termino, pagina, por_pagina: POR_PAGINA }
+      });
       setUsuarios(respuesta.data.datos);
+      // El total llega en cabeceras porque la paginación la resuelve el backend.
+      const total = Number(respuesta.headers['x-total-registros'] || 0);
+      setPaginas(Math.ceil(total / POR_PAGINA));
     } catch (err) {
       setError(err.response?.data?.mensaje || 'Error al cargar usuarios');
     } finally {
       setCargando(false);
     }
-    if (conBusqueda) setTermino('');
+  };
+
+  // Nueva búsqueda: siempre vuelve a la primera página.
+  const buscar = (e) => {
+    e.preventDefault();
+    if (pagina === 1) { cargar(); } else { setPagina(1); }
   };
 
   const abrirNuevo = () => { setEditando(null); setForm(vacio()); setModal(true); };
@@ -97,7 +111,7 @@ const Usuarios = () => {
 
       <Card className="card-kpi mb-3">
         <Card.Body>
-          <Form onSubmit={(e) => { e.preventDefault(); cargar(); }} className="d-flex gap-2">
+          <Form onSubmit={buscar} className="d-flex gap-2">
             <Form.Control style={{ maxWidth: 320 }} placeholder="Buscar por nombre de usuario o completo…"
               value={termino} onChange={(e) => setTermino(e.target.value)} />
             <Button type="submit" variant="outline-primary"><i className="bi bi-search"></i></Button>
@@ -142,6 +156,7 @@ const Usuarios = () => {
                 ))}
               </tbody>
             </Table>
+            <Paginacion pagina={pagina} paginas={paginas} onChange={setPagina} />
           </Card.Body>
         </Card>
       )}

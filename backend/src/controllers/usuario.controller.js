@@ -3,14 +3,21 @@
 const bcrypt = require('bcryptjs');
 const usuarioModel = require('../models/usuario.model');
 const { jsonExito, jsonError } = require('../utils/response');
+const { leerPaginacion, enviarCabeceras } = require('../utils/paginacion');
 
 const ROLES = ['admin', 'cajero'];
 
-// GET /api/v1/usuarios?termino=...
+// GET /api/v1/usuarios?termino=...&pagina=1&por_pagina=20
 const listar = async (req, res, next) => {
   try {
     const termino = String(req.query.termino || '').trim();
-    const usuarios = await usuarioModel.listar(termino);
+    const paginacion = leerPaginacion(req);
+    // Sin ?por_pagina devuelve todos los usuarios (compatibilidad con usos internos).
+    const usuarios = await usuarioModel.listar(termino, paginacion?.pagina ?? 1, paginacion?.porPagina ?? 0);
+    if (paginacion) {
+      const total = await usuarioModel.contar(termino);
+      enviarCabeceras(res, { ...paginacion, total });
+    }
     return jsonExito(res, usuarios, 'Usuarios obtenidos');
   } catch (err) {
     return next(err);

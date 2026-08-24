@@ -3,16 +3,31 @@
 const pool = require('../config/db');
 
 // Lista usuarios; acepta un término opcional para buscar por nombre de usuario o completo.
-const listar = async (termino = '') => {
+// Paginación opt-in: solo aplica LIMIT/OFFSET cuando porPagina > 0.
+const listar = async (termino = '', pagina = 1, porPagina = 0) => {
   const patron = `%${termino}%`;
-  const [filas] = await pool.query(
-    `SELECT id, nombre_usuario, nombre_completo, rol, activo, creado_en, actualizado_en
+  let sql = `SELECT id, nombre_usuario, nombre_completo, rol, activo, creado_en, actualizado_en
      FROM usuarios
      WHERE nombre_usuario LIKE ? OR nombre_completo LIKE ?
-     ORDER BY nombre_completo`,
+     ORDER BY nombre_completo`;
+  const parametros = [patron, patron];
+  if (porPagina > 0) {
+    sql += ' LIMIT ? OFFSET ?';
+    parametros.push(Number(porPagina), Number((pagina - 1) * porPagina));
+  }
+  const [filas] = await pool.query(sql, parametros);
+  return filas;
+};
+
+// Cuenta los usuarios que coinciden con la búsqueda (para las cabeceras de paginación).
+const contar = async (termino = '') => {
+  const patron = `%${termino}%`;
+  const [filas] = await pool.query(
+    `SELECT COUNT(*) AS total FROM usuarios
+     WHERE nombre_usuario LIKE ? OR nombre_completo LIKE ?`,
     [patron, patron]
   );
-  return filas;
+  return filas[0].total;
 };
 
 // Busca un usuario por su id (nunca devuelve el hash de la contraseña).
@@ -78,6 +93,7 @@ const contarAdminsActivos = async () => {
 
 module.exports = {
   listar,
+  contar,
   buscarPorId,
   buscarPorNombreUsuario,
   crear,

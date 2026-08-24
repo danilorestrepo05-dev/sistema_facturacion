@@ -426,7 +426,21 @@ const Caja = () => {
             </>
           )}
 
+          {/* Buscador + filtro de categoría en una sola fila: el select escala
+              sin importar cuántas categorías existan. */}
           <InputGroup className="pos-busqueda mb-3">
+            {categorias.length > 0 && (
+              <Form.Select
+                className="caja-select-categoria"
+                aria-label="Filtrar por categoría"
+                value={categoriaFiltro}
+                onChange={(e) => setCategoriaFiltro(e.target.value)}>
+                <option value="">Todas las categorías</option>
+                {categorias.filter((c) => c.activo === 1).map((c) => (
+                  <option key={c.id} value={String(c.id)}>{c.nombre}</option>
+                ))}
+              </Form.Select>
+            )}
             <Form.Control
               placeholder="Buscar por código, nombre o categoría…"
               value={termino}
@@ -436,21 +450,6 @@ const Caja = () => {
               <i className="bi bi-x-lg"></i>
             </Button>
           </InputGroup>
-
-          <div className="caja-chips mb-3" hidden={categorias.length === 0}>
-            <Button size="sm" variant={categoriaFiltro === '' ? 'primary' : 'outline-primary'}
-              className="caja-chip" onClick={() => setCategoriaFiltro('')}>
-              Todas
-            </Button>
-            {categorias.filter((c) => c.activo === 1).map((c) => (
-              <Button key={c.id} size="sm"
-                variant={categoriaFiltro === String(c.id) ? 'primary' : 'outline-primary'}
-                className="caja-chip"
-                onClick={() => setCategoriaFiltro(categoriaFiltro === String(c.id) ? '' : String(c.id))}>
-                {c.nombre}
-              </Button>
-            ))}
-          </div>
 
           <div className="row g-2 caja-listado">
             {productosFiltrados.length === 0 && (

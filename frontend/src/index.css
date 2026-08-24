@@ -232,25 +232,52 @@ body {
   }
 }
 
-/* Barra de categorías del POS: una sola línea con desplazamiento horizontal */
-.caja-chips {
-  display: flex;
-  gap: 0.4rem;
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
+/* Select de categorías dentro del buscador del POS: ancho fijo para que
+   el campo de texto conserve el resto de la fila sin importar cuántas
+   categorías existan. La especificidad extra vence al flex de Bootstrap
+   para hijos de .input-group. */
+.pos-busqueda .caja-select-categoria {
+  flex: 0 0 auto;
+  width: 190px;
 }
 
-/* El buscador y los chips viven en una columna flexible de altura fija:
-   sin flex-shrink:0 el reparto de espacio los comprime ("aplastados")
-   cuando la ventana baja de alto. El grid ya absorbe el ajuste con su scroll. */
-.pos-busqueda,
-.caja-chips {
+/* El buscador vive en una columna flexible de altura fija:
+   sin flex-shrink:0 el reparto de espacio lo comprime cuando la
+   ventana baja de alto. El grid ya absorbe el ajuste con su scroll. */
+.pos-busqueda {
   flex-shrink: 0;
 }
 
-.caja-chip {
-  white-space: nowrap;
-  flex: 0 0 auto;
+/* El campo de texto puede encoger para dejar sitio al select en pantallas angostas */
+.pos-busqueda .form-control {
+  min-width: 0;
+}
+
+/* Scrollbars sutiles solo en el POS de escritorio (clase pos-activa en <html>):
+   pista transparente y tirador gris semitransparente que se oscurece al
+   pasar el mouse sobre él. Las demás vistas conservan el scrollbar nativo. */
+html.pos-activo * {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(108, 117, 125, 0.35) transparent;
+}
+
+html.pos-activo *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html.pos-activo *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html.pos-activo *::-webkit-scrollbar-thumb {
+  background: rgba(108, 117, 125, 0.35);
+  border-radius: 4px;
+}
+
+html.pos-activo *::-webkit-scrollbar-thumb:hover,
+html.pos-activo *::-webkit-scrollbar-thumb:active {
+  background: rgba(108, 117, 125, 0.65);
 }
 
 /* Botón flotante que abre el carrito en pantallas pequeñas

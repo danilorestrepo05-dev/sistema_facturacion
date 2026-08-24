@@ -634,6 +634,21 @@ async function main() {
     Number(pagMov.headers.get('x-total-registros')) >= 2,
     `total=${pagMov.headers.get('x-total-registros')}`);
 
+  const pagUsuarios = await peticion('GET', '/usuarios?por_pagina=1&pagina=1', tokenAdmin);
+  ok('Paginación de usuarios: solo 1 fila y total en cabecera',
+    pagUsuarios.status === 200 && pagUsuarios.datos.datos.length === 1 &&
+    Number(pagUsuarios.headers.get('x-total-registros')) >= 2,
+    `total=${pagUsuarios.headers.get('x-total-registros')}`);
+
+  const pagUsuarios2 = await peticion('GET', '/usuarios?por_pagina=1&pagina=2', tokenAdmin);
+  ok('Página 2 de usuarios no repite la página 1',
+    pagUsuarios2.status === 200 && pagUsuarios2.datos.datos.length > 0 &&
+    !pagUsuarios2.datos.datos.some((u) => pagUsuarios.datos.datos.some((v) => v.id === u.id)));
+
+  const usuariosSinPaginar = await peticion('GET', '/usuarios', tokenAdmin);
+  ok('Usuarios sin por_pagina se conservan completos',
+    usuariosSinPaginar.status === 200 && !usuariosSinPaginar.headers.get('x-paginas'));
+
   const sinPaginar = await peticion('GET', '/productos', tokenAdmin);
   ok('Sin por_pagina se conserva el listado completo (selectores)',
     sinPaginar.status === 200 && sinPaginar.datos.datos.length >= 3 && !sinPaginar.headers.get('x-paginas'));
