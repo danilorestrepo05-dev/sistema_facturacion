@@ -169,6 +169,10 @@ async function main() {
   ok('Lookup por código de barras devuelve el producto',
     lookupBarras.status === 200 && lookupBarras.datos.datos.id === idProducto2);
 
+  // Compras (v0.9.31): el lookup también trae precio_compra para precargar el costo.
+  ok('Lookup incluye precio_compra para precarga en Compras',
+    lookupBarras.status === 200 && Number(lookupBarras.datos.datos.precio_compra) === 1000);
+
   const barrasDesconocido = await peticion('GET', `/productos/codigo-barras/NOEXISTE-${sufijo}`, tokenCajero);
   ok('Código de barras inexistente rechazado (404)', barrasDesconocido.status === 404);
 

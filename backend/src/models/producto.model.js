@@ -39,12 +39,12 @@ const buscarPorId = async (id) => {
   return filas[0] || null;
 };
 
-// Busca un producto ACTIVO por su código de barras (para el escáner en Caja).
+// Busca un producto ACTIVO por su código de barras (escáner en Caja y Compras).
 const buscarPorCodigoBarras = async (codigoBarras) => {
   const consulta = `
     SELECT p.id, p.codigo, p.codigo_barras, p.nombre,
            i.porcentaje AS impuesto_porcentaje,
-           p.precio_venta, p.stock_actual
+           p.precio_compra, p.precio_venta, p.stock_actual
     FROM productos p
     LEFT JOIN impuestos i ON i.id = p.impuesto_id
     WHERE p.codigo_barras = ? AND p.activo = 1`;

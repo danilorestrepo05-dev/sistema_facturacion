@@ -63,15 +63,18 @@ const Compras = () => {
     return producto && Number(producto.precio_compra) > 0 ? String(producto.precio_compra) : '';
   };
 
-  // Al elegir un producto manualmente, precarga su último costo conocido
-  // si el campo costo todavía está vacío.
+  // Al elegir o cambiar de producto en una línea, el costo se sugiere siempre
+  // con el último costo conocido del producto elegido (queda editable después).
   const cambiarLinea = (indice, campo, valor) => {
     setLineas((prev) =>
       prev.map((l, i) => {
         if (i !== indice) return l;
         if (campo === 'producto_id') {
-          const costoPrecarga = !l.costo_unitario && valor ? costoConocido(valor) : l.costo_unitario;
-          return { ...l, producto_id: valor, costo_unitario: costoPrecarga };
+          return {
+            ...l,
+            producto_id: valor,
+            costo_unitario: valor ? costoConocido(valor) : l.costo_unitario
+          };
         }
         return { ...l, [campo]: valor };
       })
@@ -100,14 +103,14 @@ const Compras = () => {
             i === indice ? { ...l, cantidad: String(Number(l.cantidad || 0) + 1) } : l
           );
         }
-        // Si hay una línea vacía, úsala; si no, agrega una nueva. En ambos
-        // casos precarga el último costo conocido solo si el campo estaba vacío.
+        // Si hay una línea vacía, úsala; si no, agrega una nueva. El costo se
+        // sugiere siempre con el último costo conocido del producto escaneado.
         const vacia = prev.findIndex((l) => !l.producto_id);
         const costo = Number(producto.precio_compra) > 0 ? String(producto.precio_compra) : '';
         if (vacia >= 0) {
           return prev.map((l, i) =>
             i === vacia
-              ? { ...l, producto_id: String(producto.id), cantidad: l.cantidad || '1', costo_unitario: l.costo_unitario || costo }
+              ? { ...l, producto_id: String(producto.id), cantidad: l.cantidad || '1', costo_unitario: costo }
               : l
           );
         }
