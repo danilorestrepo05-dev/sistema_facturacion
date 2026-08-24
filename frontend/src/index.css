@@ -91,6 +91,9 @@ body {
 .app-main {
   padding: 1.5rem;
   flex: 1;
+  /* Columna flexible para que vistas como Caja hereden el alto disponible. */
+  display: flex;
+  flex-direction: column;
 }
 
 /* En pantallas muy pequeñas se reduce el margen del contenido. */
@@ -162,29 +165,56 @@ body {
 }
 
 /* Caja: scroll independiente por panel (solo escritorio, >=992px).
-   La fila del POS toma una altura fija y cada columna se desplaza por su cuenta,
-   de modo que con 30+ productos el carrito siempre queda a la vista. */
+   La vista llena el alto disponible de app-main (sin cálculos fijos, así los
+   avisos de turno no rompen la distribución) y cada columna se desplaza por
+   su cuenta, de modo que con 30+ productos el carrito siempre queda a la vista. */
 @media (min-width: 992px) {
+  .vista-caja {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
   .caja-fila {
-    height: calc(100vh - 175px);
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .caja-col {
     min-height: 0;
+    overflow: hidden;
   }
 
-  /* Listado de productos: ocupa el espacio restante de su columna */
+  /* Listado de productos: ocupa el espacio restante de su columna.
+     align-content impide que las filas del grid se estiren cuando sobra espacio
+     vertical (las tarjetas mantienen su altura natural). */
   .caja-listado {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    align-content: flex-start;
   }
 
-  /* Panel del carrito: alto completo con desplazamiento propio */
+  /* Panel del carrito: puede encoger por debajo de su contenido y scrollea */
   .caja-panel {
-    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
   }
+}
+
+/* Barra de categorías del POS: una sola línea con desplazamiento horizontal */
+.caja-chips {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.caja-chip {
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 /* Botón flotante que abre el carrito en pantallas pequeñas

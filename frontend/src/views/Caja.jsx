@@ -35,6 +35,9 @@ const Caja = () => {
 
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
+  const [categorias, setCategorias] = useState([]);
+  // Categoría seleccionada en los chips ('' = todas).
+  const [categoriaFiltro, setCategoriaFiltro] = useState('');
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
@@ -86,12 +89,14 @@ const Caja = () => {
     setCargando(true);
     setError('');
     try {
-      const [respProductos, respClientes] = await Promise.all([
+      const [respProductos, respClientes, respCategorias] = await Promise.all([
         api.get('/productos', { params: { termino: '' } }),
-        api.get('/clientes')
+        api.get('/clientes'),
+        api.get('/categorias')
       ]);
       setProductos(respProductos.data.datos);
       setClientes(respClientes.data.datos);
+      setCategorias(respCategorias.data.datos);
     } catch (err) {
       setError(err.response?.data?.mensaje || 'Error al cargar los datos de la caja');
     } finally {
@@ -99,17 +104,19 @@ const Caja = () => {
     }
   };
 
-  // Productos visibles según el término de búsqueda.
+  // Productos visibles según la categoría elegida (chips) y el término de búsqueda.
   const productosFiltrados = useMemo(() => {
     const t = termino.trim().toLowerCase();
-    if (!t) return productos.filter((p) => p.activo === 1);
+    const cat = categoriaFiltro ? Number(categoriaFiltro) : null;
     return productos.filter(
       (p) => p.activo === 1 &&
-        (p.nombre.toLowerCase().includes(t) ||
-         p.codigo.toLowerCase().includes(t) ||
-         (p.categoria_nombre || '').toLowerCase().includes(t))
+        (cat === null || p.categoria_id === cat) &&
+        (!t ||
+          p.nombre.toLowerCase().includes(t) ||
+          p.codigo.toLowerCase().includes(t) ||
+          (p.categoria_nombre || '').toLowerCase().includes(t))
     );
-  }, [productos, termino]);
+  }, [productos, termino, categoriaFiltro]);
 
   // El descuento total (líneas + adicional) no puede dejar la venta en $0
   // ni en negativo; el backend lo rechaza con 400 como segunda barrera.
@@ -355,7 +362,7 @@ const Caja = () => {
   }
 
   return (
-    <div>
+    <div className="vista-caja">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h4 className="mb-0">Caja</h4>
         {visadorActivo && (
@@ -421,6 +428,21 @@ const Caja = () => {
               <i className="bi bi-x-lg"></i>
             </Button>
           </InputGroup>
+
+          <div className="caja-chips mb-3" hidden={categorias.length === 0}>
+            <Button size="sm" variant={categoriaFiltro === '' ? 'primary' : 'outline-primary'}
+              className="caja-chip" onClick={() => setCategoriaFiltro('')}>
+              Todas
+            </Button>
+            {categorias.filter((c) => c.activo === 1).map((c) => (
+              <Button key={c.id} size="sm"
+                variant={categoriaFiltro === String(c.id) ? 'primary' : 'outline-primary'}
+                className="caja-chip"
+                onClick={() => setCategoriaFiltro(categoriaFiltro === String(c.id) ? '' : String(c.id))}>
+                {c.nombre}
+              </Button>
+            ))}
+          </div>
 
           <div className="row g-2 caja-listado">
             {productosFiltrados.length === 0 && (
