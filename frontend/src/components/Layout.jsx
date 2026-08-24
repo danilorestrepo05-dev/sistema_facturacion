@@ -122,7 +122,7 @@ const Layout = () => {
       {/* Barra lateral de navegación (solo pantallas grandes) */}
       <aside className="app-sidebar d-none d-lg-flex">
         <div className="marca d-flex align-items-center gap-2">
-          <i className="bi bi-cup-hot-fill"></i>
+          <i className="bi bi-storefront"></i>
           <span>Mi Negocio</span>
         </div>
         <Navegacion esAdmin={esAdmin} />
@@ -137,7 +137,7 @@ const Layout = () => {
       >
         <Offcanvas.Header className="marca">
           <Offcanvas.Title>
-            <i className="bi bi-cup-hot-fill me-2"></i>
+            <i className="bi bi-storefront me-2"></i>
             <span>Mi Negocio</span>
           </Offcanvas.Title>
         </Offcanvas.Header>

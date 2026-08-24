@@ -158,7 +158,7 @@ const Proveedores = () => {
               </Col>
               <Col md={12}>
                 <Form.Label>Tipo de item</Form.Label>
-                <Form.Control placeholder="Ej. Café, pasilla, azúcar" value={form.tipo_item}
+                <Form.Control placeholder="Ej. bebidas, aseo, papelería" value={form.tipo_item}
                   onChange={(e) => setForm({ ...form, tipo_item: e.target.value })} />
               </Col>
               <Col md={6}>

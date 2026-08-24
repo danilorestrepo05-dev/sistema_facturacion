@@ -7,7 +7,7 @@ const path = require('path');
 const PUERTO = 3456;
 const BASE = `http://127.0.0.1:${PUERTO}/api/v1`;
 const NOMBRE_TEST = `Proveedor Test ${Date.now()}`;
-const TIPO_TEST = 'Café, pasilla, azúcar';
+const TIPO_TEST = 'Bebidas, aseo, papelería';
 
 // Levanta el servidor en un puerto de prueba para no chocar con el de desarrollo.
 const server = spawn(process.execPath, ['src/server.js'], {
@@ -48,10 +48,10 @@ async function main() {
   console.log('Creado con tipo_item =', JSON.stringify(creado.datos.datos.tipo_item));
 
   // 3. Buscar por término que coincide con tipo_item.
-  const buscado = await peticion('GET', `/proveedores?termino=${encodeURIComponent('pasilla')}`, token);
+  const buscado = await peticion('GET', `/proveedores?termino=${encodeURIComponent('aseo')}`, token);
   const encontrado = buscado.datos.datos.find((p) => p.id === id);
   if (!encontrado) throw new Error('Búsqueda por tipo_item no encontró el proveedor');
-  console.log('Búsqueda por "pasilla" OK:', encontrado.nombre);
+  console.log('Búsqueda por "aseo" OK:', encontrado.nombre);
 
   // 4. Actualizar tipo_item (vacío -> NULL).
   const actualizado = await peticion('PUT', `/proveedores/${id}`, token, {
@@ -65,7 +65,7 @@ async function main() {
 
   // 5. Actualizar tipo_item de nuevo y limpiar.
   await peticion('PUT', `/proveedores/${id}`, token, {
-    nombre: NOMBRE_TEST, tipo_documento: 'NIT', tipo_item: 'Granos'
+    nombre: NOMBRE_TEST, tipo_documento: 'NIT', tipo_item: 'Insumos'
   });
   const borrado = await peticion('DELETE', `/proveedores/${id}`, token);
   if (borrado.status !== 200) throw new Error(`Eliminar falló: ${JSON.stringify(borrado.datos)}`);

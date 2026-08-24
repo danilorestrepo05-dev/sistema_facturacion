@@ -149,7 +149,7 @@ async function main() {
   const idImpuesto = nuevoImpuesto.datos.datos.id;
 
   const producto1 = await peticion('POST', '/productos', tokenAdmin, {
-    codigo: `P-${sufijo}-1`, nombre: `Cafe Test ${sufijo}`, descripcion: 'Producto 1 del smoke test',
+    codigo: `P-${sufijo}-1`, nombre: `Producto A Test ${sufijo}`, descripcion: 'Producto 1 del smoke test',
     categoria_id: idCategoria, impuesto_id: idImpuesto,
     precio_compra: 2000, precio_venta: 4000, stock_actual: 50, stock_minimo: 5, unidad_medida: 'kg', activo: 1
   });
@@ -157,7 +157,7 @@ async function main() {
   const idProducto1 = producto1.datos.datos.id;
 
   const producto2 = await peticion('POST', '/productos', tokenAdmin, {
-    codigo: `P-${sufijo}-2`, nombre: `Pasilla Test ${sufijo}`, categoria_id: idCategoria,
+    codigo: `P-${sufijo}-2`, nombre: `Producto B Test ${sufijo}`, categoria_id: idCategoria,
     impuesto_id: idImpuesto, precio_compra: 1000, precio_venta: 2500, stock_actual: 10,
     stock_minimo: 2, activo: 1, codigo_barras: `EAN-${sufijo}`
   });
@@ -239,12 +239,12 @@ async function main() {
 
   const nuevoProveedor = await peticion('POST', '/proveedores', tokenAdmin, {
     nombre: `Proveedor Test ${sufijo}`, tipo_documento: 'NIT', documento: String(900000000 + sufijo),
-    telefono: '3200000000', email: `proveedor${sufijo}@test.co`, direccion: 'Carrera 10', tipo_item: 'Café, pasilla, azúcar', activo: 1
+    telefono: '3200000000', email: `proveedor${sufijo}@test.co`, direccion: 'Carrera 10', tipo_item: 'Bebidas, aseo, papelería', activo: 1
   });
-  ok('Crear proveedor con tipo_item', nuevoProveedor.status === 201 && nuevoProveedor.datos.datos.tipo_item === 'Café, pasilla, azúcar');
+  ok('Crear proveedor con tipo_item', nuevoProveedor.status === 201 && nuevoProveedor.datos.datos.tipo_item === 'Bebidas, aseo, papelería');
   const idProveedor = nuevoProveedor.datos.datos.id;
 
-  const buscaProvTipo = await peticion('GET', `/proveedores?termino=${encodeURIComponent('pasilla')}`, tokenAdmin);
+  const buscaProvTipo = await peticion('GET', `/proveedores?termino=${encodeURIComponent('aseo')}`, tokenAdmin);
   ok('Búsqueda de proveedor por tipo_item (v0.9.5)', buscaProvTipo.datos.datos.some((p) => p.id === idProveedor));
 
   console.log('\n=== 5. Facturación ===');
