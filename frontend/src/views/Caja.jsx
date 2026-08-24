@@ -336,19 +336,21 @@ const Caja = () => {
         </Alert>
       )}
 
-      {/* Resumen de totales en una sola línea + TOTAL destacado */}
+      {/* Totales en filas separadas, con fuente algo menor para ahorrar alto */}
       <div className="border-top pt-2">
-        <div className="small text-secondary">
-          Subtotal {formatoMoneda(totales.subtotal)} · IVA {formatoMoneda(totales.impuesto)}
-          {totales.descuento > 0 && <> · Descuento -{formatoMoneda(totales.descuento)}</>}
-        </div>
+        <FilaTotal etiqueta="Subtotal" valor={formatoMoneda(totales.subtotal)} />
+        <FilaTotal etiqueta="Impuestos" valor={formatoMoneda(totales.impuesto)} />
+        {totales.descuento > 0 &&
+          <FilaTotal etiqueta="Descuento" valor={`- ${formatoMoneda(totales.descuento)}`} />}
         <div className="d-flex justify-content-between align-items-center mt-1">
-          <span className="fw-bold fs-5">TOTAL</span>
-          <span className="fw-bold fs-5 text-primary">{formatoMoneda(totales.total)}</span>
+          <span className="fw-bold" style={{ fontSize: '1.1rem' }}>TOTAL</span>
+          <span className="fw-bold text-primary" style={{ fontSize: '1.1rem' }}>
+            {formatoMoneda(totales.total)}
+          </span>
         </div>
       </div>
 
-      <Button variant="success" className="w-100 mt-2" size="lg"
+      <Button variant="success" className="w-100 mt-2"
         disabled={carrito.length === 0 || guardando || ventaSinSaldo || ventaBloqueadaPorTurno}
         onClick={emitir}>
         {guardando ? 'Emitiendo…' : <><i className="bi bi-receipt me-2"></i>Cobrar y emitir factura</>}
@@ -379,7 +381,7 @@ const Caja = () => {
   const tarjetaVenta = (
     <Card className="card-kpi caja-tarjeta-venta">
       <div className="caja-panel-lista p-3 pb-2">{contenidoVenta}</div>
-      <div className="caja-panel-pie px-3 pb-3">{pieVenta}</div>
+      <div className="caja-panel-pie px-3 pt-3 pb-3">{pieVenta}</div>
     </Card>
   );
 
@@ -551,6 +553,15 @@ const Caja = () => {
     </div>
   );
 };
+
+// Fila compacta de los totales del carrito (fuente algo menor que el texto base).
+const FilaTotal = ({ etiqueta, valor }) => (
+  <div className="d-flex justify-content-between text-secondary"
+    style={{ fontSize: '0.8125rem', lineHeight: 1.5 }}>
+    <span>{etiqueta}</span>
+    <span>{valor}</span>
+  </div>
+);
 
 // Input de descuento por línea con borrador local: mientras el usuario teclea
 // el valor vive aquí (permite borrar y escribir sin que se reescriba un "0");

@@ -252,6 +252,14 @@ body {
 .caja-tarjeta-venta {
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* recorta el fondo del pie en las esquinas redondeadas */
+}
+
+/* Pie fijo de la venta con fondo diferenciado, siguiendo el mismo patrón de
+   los pies de modal de Bootstrap (gris muy claro + borde superior sutil). */
+.caja-panel-pie {
+  background-color: var(--bs-tertiary-bg);
+  border-top: 1px solid var(--bs-border-color-translucent);
 }
 
 /* Select de categorías dentro del buscador del POS: ancho fijo para que
