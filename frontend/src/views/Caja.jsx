@@ -66,6 +66,14 @@ const Caja = () => {
     cargarDatos();
   }, []);
 
+  // En escritorio el POS acota el layout global (clase pos-activo en <html>)
+  // para que los paneles internos hagan scroll por separado; al salir de la
+  // vista se retira la clase y las demás pantallas conservan su scroll normal.
+  useEffect(() => {
+    document.documentElement.classList.add('pos-activo');
+    return () => document.documentElement.classList.remove('pos-activo');
+  }, []);
+
   // Consulta el turno abierto del usuario cuando el arqueo está activo.
   // Sin turno la venta se bloquea en la pantalla y también lo valida el backend.
   const consultarTurno = async () => {

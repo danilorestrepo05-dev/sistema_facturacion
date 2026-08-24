@@ -169,6 +169,18 @@ body {
    avisos de turno no rompen la distribución) y cada columna se desplaza por
    su cuenta, de modo que con 30+ productos el carrito siempre queda a la vista. */
 @media (min-width: 992px) {
+  /* Con pos-activo (puesta por la vista Caja) el shell queda acotado a la
+     ventana: sin este tope los paneles internos nunca desbordan y toda la
+     página scrollea en bloque. Las demás vistas no tienen la clase y siguen igual. */
+  html.pos-activo,
+  html.pos-activo body {
+    overflow: hidden;
+  }
+
+  html.pos-activo .app-layout {
+    height: 100vh;
+  }
+
   .vista-caja {
     flex: 1 1 auto;
     display: flex;
