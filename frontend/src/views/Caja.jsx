@@ -554,12 +554,12 @@ const Caja = () => {
   );
 };
 
-// Fila compacta de los totales del carrito (fuente algo menor que el texto base).
+// Fila compacta de los totales del carrito (fuente algo menor y en negrita).
 const FilaTotal = ({ etiqueta, valor }) => (
   <div className="d-flex justify-content-between text-secondary"
     style={{ fontSize: '0.8125rem', lineHeight: 1.5 }}>
-    <span>{etiqueta}</span>
-    <span>{valor}</span>
+    <span className="fw-bold">{etiqueta}</span>
+    <span className="fw-bold">{valor}</span>
   </div>
 );
 
