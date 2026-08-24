@@ -6,15 +6,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import {
-  Row, Col, Card, Form, Button, Spinner, Alert, InputGroup
+  Row, Col, Card, Form, Button, Spinner, Alert, InputGroup, Modal
 } from 'react-bootstrap';
 import api from '../services/api';
 import { formatoMoneda } from '../utils/format';
+import { useConfig } from '../context/ConfigContext';
 
 // Fila vacía del formulario de líneas.
 const filaVacia = () => ({ producto_id: '', cantidad: '', costo_unitario: '' });
 
 const Compras = () => {
+  // El escáner de códigos de barras solo se muestra si el flag está activo,
+  // igual que en Caja.
+  const { estaHabilitado } = useConfig();
+  const escaneoActivo = estaHabilitado('codigo_barras_habilitado');
+
   const [productos, setProductos] = useState([]);
   const [proveedores, setProveedores] = useState([]);
   const [proveedorId, setProveedorId] = useState('');
@@ -24,10 +30,12 @@ const Compras = () => {
   const [error, setError] = useState('');
   const [exito, setExito] = useState(null); // Resumen de la última compra registrada
 
-  // Escáner de código de barras (la pistola USB escribe y envía Enter).
+  // Escáner de código de barras (pistola USB o cámara del móvil/PC).
   const [codigoEscaneado, setCodigoEscaneado] = useState('');
   const [avisoEscaneo, setAvisoEscaneo] = useState('');
   const escaneoRef = useRef(null);
+  const videoRef = useRef(null);
+  const [camaraAbierta, setCamaraAbierta] = useState(false);
 
   // Carga el catálogo de productos y proveedores activos.
   useEffect(() => {
@@ -98,6 +106,37 @@ const Compras = () => {
       procesarCodigo(codigoEscaneado);
     }
   };
+
+  // Cámara: abre el lector de ZXing sobre el video del modal (importación
+  // perezosa, solo se carga si se usa). Se detiene tras el primer código leído.
+  // Permite escanear con la cámara del móvil o del PC sin pistola USB.
+  useEffect(() => {
+    if (!camaraAbierta) return;
+    let cancelado = false;
+    let controles = null;
+
+    (async () => {
+      try {
+        const { BrowserMultiFormatReader } = await import('@zxing/browser');
+        const lector = new BrowserMultiFormatReader();
+        controles = await lector.decodeFromVideoDevice(undefined, videoRef.current, (resultado, err, ctrl) => {
+          if (resultado && !cancelado) {
+            procesarCodigo(resultado.getText());
+            setCamaraAbierta(false);
+            ctrl?.stop();
+          }
+        });
+      } catch {
+        setAvisoEscaneo('No se pudo abrir la cámara. Recuerda que exige HTTPS o localhost.');
+        setCamaraAbierta(false);
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+      try { controles?.stop(); } catch { /* ya detenido */ }
+    };
+  }, [camaraAbierta]);
 
   // Validaciones en pantalla: líneas completas (costo obligatorio >= 0)
   // y sin productos repetidos.
@@ -186,25 +225,31 @@ const Compras = () => {
 
             {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
 
-            {/* Escáner de código de barras */}
-            <Form.Group className="mb-3" controlId="escaneo-compra">
-              <Form.Label className="small mb-1">Escanear código de barras</Form.Label>
-              <InputGroup>
-                <InputGroup.Text><i className="bi bi-upc-scan"></i></InputGroup.Text>
-                <Form.Control
-                  ref={escaneoRef}
-                  autoComplete="off"
-                  placeholder="Dispara la pistola o digita el código y presiona Enter"
-                  value={codigoEscaneado}
-                  onChange={(e) => setCodigoEscaneado(e.target.value)}
-                  onKeyDown={teclaEscaneo}
-                />
-              </InputGroup>
-              <Form.Text muted>
-                Si el producto ya está en la lista, suma una unidad; si no, agrega una línea nueva.
-              </Form.Text>
-              {avisoEscaneo && <Alert variant="warning" className="py-2 small mt-2 mb-0">{avisoEscaneo}</Alert>}
-            </Form.Group>
+            {/* Escáner de código de barras (pistola USB o cámara) */}
+            {escaneoActivo && (
+              <Form.Group className="mb-3" controlId="escaneo-compra">
+                <Form.Label className="small mb-1">Escanear código de barras</Form.Label>
+                <InputGroup>
+                  <InputGroup.Text><i className="bi bi-upc-scan"></i></InputGroup.Text>
+                  <Form.Control
+                    ref={escaneoRef}
+                    autoComplete="off"
+                    placeholder="Dispara la pistola o digita el código y presiona Enter"
+                    value={codigoEscaneado}
+                    onChange={(e) => setCodigoEscaneado(e.target.value)}
+                    onKeyDown={teclaEscaneo}
+                  />
+                  <Button variant="outline-primary" title="Escanear con la cámara"
+                    onClick={() => setCamaraAbierta(true)}>
+                    <i className="bi bi-camera"></i>
+                  </Button>
+                </InputGroup>
+                <Form.Text muted>
+                  Si el producto ya está en la lista, suma una unidad; si no, agrega una línea nueva.
+                </Form.Text>
+                {avisoEscaneo && <Alert variant="warning" className="py-2 small mt-2 mb-0">{avisoEscaneo}</Alert>}
+              </Form.Group>
+            )}
 
             {exito && (
               <Alert variant="success" dismissible onClose={() => setExito(null)}>
@@ -334,8 +379,19 @@ const Compras = () => {
           </Card.Body>
         </Card>
       </Col>
+
+      {/* Modal de escaneo con cámara (móvil o PC) */}
+      <Modal show={camaraAbierta} onHide={() => setCamaraAbierta(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="fs-6">Apunta la cámara al código de barras</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-0">
+          <video ref={videoRef} style={{ width: '100%', display: 'block', borderRadius: '0 0 6px 6px' }} muted />
+        </Modal.Body>
+      </Modal>
     </Row>
   );
 };
 
 export default Compras;
+
