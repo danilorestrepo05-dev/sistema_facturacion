@@ -181,6 +181,22 @@ body {
     height: 100vh;
   }
 
+  /* Eslabones que faltaban de la cadena: con min-height:auto (el valor por
+     defecto de los flex-items) el contenido los obliga a crecer y la página
+     vuelve a desplazarse en bloque. Con min-height:0 quedan acotados y los
+     paneles internos pueden desbordar hacia sus propios scrolls. */
+  html.pos-activo .app-contenido,
+  html.pos-activo .app-main {
+    min-height: 0;
+  }
+
+  /* Sin wrap en la fila del POS: los contenedores flex con wrap estiran cada
+     línea al tamaño de su contenido y por eso las columnas seguían creciendo.
+     En una sola línea, el stretch sí les da altura definida (la del panel). */
+  html.pos-activo .caja-fila {
+    flex-wrap: nowrap;
+  }
+
   .vista-caja {
     flex: 1 1 auto;
     display: flex;
