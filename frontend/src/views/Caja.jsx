@@ -2,7 +2,7 @@
 // Punto de venta: busca productos, arma la venta y emite la factura.
 import { useEffect, useState, useMemo, useRef } from 'react';
 import {
-  Row, Col, Card, Form, Button, InputGroup, ListGroup, Badge,
+  Row, Col, Card, Form, Button, InputGroup, ListGroup, Table, Badge,
   Spinner, Alert, Modal, Offcanvas
 } from 'react-bootstrap';
 import api from '../services/api';
@@ -257,10 +257,11 @@ const Caja = () => {
   };
 
   // Carrito "Venta actual" dividido en dos zonas reutilizables:
-  // - contenidoVenta: título y lista de ítems (lo único que scrollea en escritorio).
-  // - pieVenta: cliente, pago, descuento, totales y Cobrar (siempre visible).
-  // La tarjeta compuesta sirve igual para el panel derecho y el panel deslizante
-  // del móvil; es el CSS quien acota las alturas solo en escritorio.
+  // - contenidoVenta: título y lista de ítems.
+  // - pieVenta: cliente, pago, descuento, totales y Cobrar.
+  // Ambas zonas componen la tarjeta que usa SOLO el panel deslizante del
+  // móvil; el escritorio muestra la venta como tabla (tablaVenta) con sus
+  // controles en la barra inferior fija (barraInferior).
   const contenidoVenta = (
     <>
       <Card.Title className="fs-6">Venta actual</Card.Title>
@@ -377,14 +378,157 @@ const Caja = () => {
     </>
   );
 
-  // Tarjeta compuesta: en escritorio el CSS parte estas dos zonas (la lista
-  // scrollea con su propio scroll y el pie queda clavado abajo); en móvil
-  // ambas fluyen de forma natural dentro del panel deslizante.
+  // Tarjeta compuesta: SOLO la usa el panel deslizante del móvil. En
+  // escritorio el CSS parte estas dos zonas (la lista scrollea con su propio
+  // scroll y el pie queda clavado abajo); en móvil ambas fluyen de forma
+  // natural dentro del panel deslizante.
   const tarjetaVenta = (
     <Card className="card-kpi caja-tarjeta-venta">
       <div className="caja-panel-lista p-3 pb-2">{contenidoVenta}</div>
       <div className="caja-panel-pie px-3 pt-3 pb-3">{pieVenta}</div>
     </Card>
+  );
+
+  // Tabla de la venta estilo módulo Ventas de Odoo: cada producto agregado es
+  // una fila (Producto | Cant | P. unitario | Dto $ | Total | ✕) y solo esta
+  // zona scrollea dentro de su columna.
+  const tablaVenta = (
+    <Card className="card-kpi caja-tarjeta-venta">
+      <Card.Header className="d-flex justify-content-between align-items-center py-2">
+        <span className="fw-semibold">Venta actual</span>
+        <Badge bg="secondary" pill>{carrito.length} ítem(s)</Badge>
+      </Card.Header>
+      <div className="caja-panel-lista">
+        <Table hover size="sm" className="align-middle mb-0 tabla-venta">
+          <thead className="table-light">
+            <tr>
+              <th>Producto</th>
+              <th>Cant.</th>
+              <th className="text-end">P. unitario</th>
+              <th>Dto $</th>
+              <th className="text-end">Total</th>
+              <th aria-label="Eliminar"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {carrito.length === 0 && (
+              <tr>
+                <td colSpan={6} className="text-secondary small py-4 text-center">
+                  Agrega productos para iniciar la venta.
+                </td>
+              </tr>
+            )}
+            {carrito.map((item) => (
+              <tr key={item.producto_id}>
+                <td>
+                  <div className="fw-semibold small">{item.nombre}</div>
+                  <div className="text-secondary" style={{ fontSize: '0.75rem' }}>
+                    IVA {item.impuesto_porcentaje}%
+                  </div>
+                </td>
+                <td>
+                  <Form.Control
+                    type="number" size="sm" min={1} style={{ width: 64 }}
+                    value={item.cantidad}
+                    onChange={(e) => cambiarCantidad(item.producto_id, e.target.value)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                  />
+                </td>
+                <td className="text-end small">{formatoMoneda(item.precio)}</td>
+                <td><CampoDescuento item={item} onCambiar={cambiarDescuento} /></td>
+                <td className="text-end">
+                  <strong className="small">
+                    {formatoMoneda(item.precio * item.cantidad - (Number(item.descuento) || 0))}
+                  </strong>
+                </td>
+                <td>
+                  <Button size="sm" variant="outline-danger"
+                    title={`Quitar ${item.nombre}`}
+                    onClick={() => quitar(item.producto_id)}>
+                    <i className="bi bi-trash"></i>
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
+    </Card>
+  );
+
+  // Barra inferior fija de toda la pantalla (estilo Odoo): controles de la
+  // venta a la izquierda, totales y Cobrar a la derecha. Se actualiza al
+  // agregar cada producto y nunca se pierde de vista.
+  const barraInferior = (
+    <div className="pos-barra-inferior d-none d-lg-flex">
+      {ventaSinSaldo && (
+        <Alert variant="danger" className="py-1 px-2 small mb-0 w-100 order-first">
+          El descuento no puede superar ni igualar el valor de la venta.
+        </Alert>
+      )}
+
+      <div className="pos-barra-filtros">
+        <div>
+          <Form.Label className="small mb-0 text-secondary">Cliente</Form.Label>
+          <Form.Select size="sm" style={{ minWidth: 180 }}
+            value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
+            <option value="">Consumidor final</option>
+            {clientes.filter((c) => c.activo === 1).map((c) => (
+              <option key={c.id} value={c.id}>{c.nombre}</option>
+            ))}
+          </Form.Select>
+        </div>
+        <div>
+          <Form.Label className="small mb-0 text-secondary">Tipo de pago</Form.Label>
+          <Form.Select size="sm" value={tipoPago} onChange={(e) => setTipoPago(e.target.value)}>
+            {TIPOS_PAGO.map((t) => <option key={t} value={t}>{t}</option>)}
+          </Form.Select>
+        </div>
+        <div>
+          <Form.Label className="small mb-0 text-secondary">Descuento adicional $</Form.Label>
+          <Form.Control size="sm" type="number" min={0} style={{ width: 110 }}
+            value={descuento}
+            onChange={(e) => setDescuento(e.target.value)}
+            onWheel={(e) => e.currentTarget.blur()} />
+        </div>
+      </div>
+
+      <div className="pos-barra-totales">
+        <div className="text-end small lh-sm">
+          <div>Subtotal <strong>{formatoMoneda(totales.subtotal)}</strong></div>
+          <div>Impuestos <strong>{formatoMoneda(totales.impuesto)}</strong></div>
+          {totales.descuento > 0 &&
+            <div>Descuento <strong>- {formatoMoneda(totales.descuento)}</strong></div>}
+        </div>
+        <div className="text-end border-start ps-3">
+          <div className="small text-secondary">TOTAL</div>
+          <div className="fw-bold text-primary" style={{ fontSize: '1.35rem', lineHeight: 1 }}>
+            {formatoMoneda(totales.total)}
+          </div>
+        </div>
+        <Button variant="success"
+          disabled={carrito.length === 0 || guardando || ventaSinSaldo || ventaBloqueadaPorTurno}
+          onClick={emitir}>
+          {guardando ? 'Emitiendo…' : <><i className="bi bi-receipt me-2"></i>Cobrar y emitir factura</>}
+        </Button>
+
+        {/* Apertura manual de la gaveta (solo si el flag está activo) */}
+        {gavetaActiva && (
+          <>
+            <Button variant="outline-secondary" title="Envía el pulso a la gaveta a través de la impresora térmica"
+              onClick={abrirGaveta}>
+              <i className="bi bi-box-arrow-in-up"></i>
+            </Button>
+            {mensajeGaveta && (
+              <Alert variant="info" className="py-1 px-2 small mb-0 w-100 order-first"
+                dismissible onClose={() => setMensajeGaveta('')}>
+                <i className="bi bi-cash-stack me-1"></i>{mensajeGaveta}
+              </Alert>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 
   if (cargando) {
@@ -500,13 +644,16 @@ const Caja = () => {
           </div>
         </Col>
 
-        {/* Columna derecha: carrito y emisión (solo escritorio; en móvil hay botón flotante) */}
+        {/* Columna derecha: tabla de la venta (solo escritorio; en móvil hay botón flotante) */}
         <Col lg={5} className="d-none d-lg-flex flex-column caja-col">
           <div className="caja-panel">
-            {tarjetaVenta}
+            {tablaVenta}
           </div>
         </Col>
       </Row>
+
+      {/* Barra inferior fija con los controles y totales de la venta */}
+      {barraInferior}
 
       {/* Botón flotante del carrito para pantallas pequeñas */}
       {carrito.length > 0 && (

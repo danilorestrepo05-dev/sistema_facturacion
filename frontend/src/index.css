@@ -245,6 +245,35 @@ body {
   html.pos-activo .caja-panel .caja-panel-pie {
     flex: 0 0 auto;
   }
+
+  /* Barra inferior fija estilo Odoo Ventas: vive fuera del Row, ocupa todo
+     el ancho y roba un alto fijo; la fila del POS absorbe el resto. Sin
+     flex-shrink:0 los controles se aplastarían cuando falta espacio. */
+  .pos-barra-inferior {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.5rem 1rem;
+    padding: 0.6rem 0.9rem;
+    background-color: var(--bs-secondary-bg);
+    border-top: 1px solid var(--bs-border-color);
+    flex-shrink: 0;
+  }
+
+  /* Grupo de selects/inputs a la izquierda de la barra */
+  .pos-barra-filtros {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+  }
+
+  /* Grupo de totales + Cobrar pegado al borde derecho */
+  .pos-barra-totales {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto;
+  }
 }
 
 /* La tarjeta de venta se apila en dos zonas (lista + pie). En escritorio el
