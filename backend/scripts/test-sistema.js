@@ -352,6 +352,45 @@ async function main() {
   ok('Ticket desglosa descuento de líneas y adicional',
     ticketDesglose.status === 200 && String(ticketDesglose.datos).includes('Descuento') && String(ticketDesglose.datos).includes('adicional'));
 
+  // --- Impuestos combinados por línea (multi-impuesto v0.9.44) ---
+  const listaImpuestos = await peticion('GET', '/impuestos', tokenAdmin);
+  const impuestosActivos = (listaImpuestos.datos.datos || []).filter((i) => i.activo === 1);
+  if (impuestosActivos.length >= 2) {
+    const impA = impuestosActivos[0];
+    const impB = impuestosActivos[1];
+    // idProducto1 cuesta 4000; 1 unidad = base 4000.
+    // Impuesto combinado = base * (%A + %B) / 100.
+    const esperadoImp = 4000 * (Number(impA.porcentaje) + Number(impB.porcentaje)) / 100;
+    const facturaMulti = await peticion('POST', '/facturas', tokenCajero, {
+      items: [{ producto_id: idProducto1, cantidad: 1, impuestos: [impA.id, impB.id] }]
+    });
+    ok('Factura multi-impuesto emitida (201)', facturaMulti.status === 201);
+    const fm = facturaMulti.datos.datos;
+    ok('Impuestos combinados calculados correctamente',
+      Math.abs(Number(fm.impuesto_total) - esperadoImp) < 0.01,
+      `imp=${fm.impuesto_total} esperado=${esperadoImp}`);
+    const detMulti = await peticion('GET', `/facturas/${fm.id}`, tokenAdmin);
+    ok('Desglose de impuestos guardado en detalle',
+      detMulti.datos.datos.detalles[0]?.impuestos?.length === 2);
+  } else if (impuestosActivos.length === 1) {
+    const impUnico = impuestosActivos[0];
+    const esperadoImp = 4000 * Number(impUnico.porcentaje) / 100;
+    const facturaDefault = await peticion('POST', '/facturas', tokenCajero, {
+      items: [{ producto_id: idProducto1, cantidad: 1 }]
+    });
+    ok('Factura con impuesto por defecto del producto (201)', facturaDefault.status === 201);
+    ok('Detalle trae impuestos (fallback)',
+      Array.isArray(facturaDefault.datos.datos.detalles?.[0]?.impuestos));
+  } else {
+    ok('Catálogo de impuestos vacío; se omite prueba multi-impuesto', true);
+  }
+
+  const impInvalido = await peticion('POST', '/facturas', tokenCajero, {
+    items: [{ producto_id: idProducto1, cantidad: 1, impuestos: [99999] }]
+  });
+  ok('Impuesto inexistente rechazado (400)', impInvalido.status === 400,
+    impInvalido.datos?.mensaje || '');
+
   console.log('\n=== 6. Impresión: PDF y ticket POS ===');
 
   const pdfCarta = await peticion('GET', `/facturas/${idFactura}/pdf?formato=carta`, tokenAdmin);
@@ -526,10 +565,11 @@ async function main() {
   const stockRestaurado2 = await peticion('GET', `/productos/${idProducto2}`, tokenAdmin);
   // La factura anulada vendió 3 y 2 unidades; las facturas de descuento por
   // línea y de descuentos combinados (que NO se anulan) vendieron 2+1 y 1 del
-  // producto 1, y la venta del turno de arqueo vendió 1 del producto 1
-  // (tampoco se anula): el stock queda en el inicial menos 4 y menos 1.
+  // producto 1, la venta del turno de arqueo vendió 1 del producto 1
+  // (tampoco se anula), y la factura multi-impuesto vendió 1 del producto 1
+  // (no se anula): el stock queda en el inicial menos 5 y menos 1.
   ok('Stock restaurado tras anulación',
-    igual(stockRestaurado.datos.datos.stock_actual, stockAntes1 - 4) && igual(stockRestaurado2.datos.datos.stock_actual, stockAntes2 - 1),
+    igual(stockRestaurado.datos.datos.stock_actual, stockAntes1 - 5) && igual(stockRestaurado2.datos.datos.stock_actual, stockAntes2 - 1),
     `${stockAntes1}/${stockRestaurado.datos.datos.stock_actual} y ${stockAntes2}/${stockRestaurado2.datos.datos.stock_actual}`);
 
   const repMovAnul = await peticion('GET', `/reportes/movimientos?${rango}&motivo=anulacion`, tokenAdmin);

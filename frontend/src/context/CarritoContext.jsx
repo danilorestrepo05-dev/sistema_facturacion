@@ -39,7 +39,7 @@ export const CarritoProvider = ({ children }) => {
   const { usuario } = useAuth();
   const inicial = useMemo(leerStorage, []);
 
-  const [carrito, setCarrito] = useState(inicial.carrito); // [{ producto_id, nombre, precio, impuesto_porcentaje, cantidad, stock }]
+  const [carrito, setCarrito] = useState(inicial.carrito); // [{ producto_id, nombre, precio, impuestos, cantidad, stock, descuento }]
   const [clienteId, setClienteId] = useState(inicial.clienteId);
   const [tipoPago, setTipoPago] = useState(inicial.tipoPago);
   const [descuento, setDescuento] = useState(inicial.descuento);
@@ -61,6 +61,7 @@ export const CarritoProvider = ({ children }) => {
   }, [usuario]);
 
   // Agrega un producto al carrito respetando el stock disponible.
+  // El catálogo de impuestos del producto se convierte en el array inicial.
   const agregar = (producto) => {
     setCarrito((prev) => {
       const existente = prev.find((i) => i.producto_id === producto.id);
@@ -71,11 +72,21 @@ export const CarritoProvider = ({ children }) => {
         );
       }
       if (producto.stock_actual <= 0) return prev;
+      // Impuestos del producto como array de objetos {id, nombre, porcentaje}.
+      const impuestosIniciales = [];
+      if (producto.impuesto_id && producto.impuesto_porcentaje != null) {
+        impuestosIniciales.push({
+          id: Number(producto.impuesto_id),
+          nombre: producto.impuesto_nombre || '',
+          porcentaje: Number(producto.impuesto_porcentaje)
+        });
+      }
       return [...prev, {
         producto_id: producto.id,
         nombre: producto.nombre,
         precio: Number(producto.precio_venta),
-        impuesto_porcentaje: Number(producto.impuesto_porcentaje || 0),
+        impuestos: impuestosIniciales,
+        impuesto_porcentaje: Number(producto.impuesto_porcentaje || 0), // compat visor
         cantidad: 1,
         stock: producto.stock_actual,
         descuento: 0
@@ -103,6 +114,18 @@ export const CarritoProvider = ({ children }) => {
     );
   };
 
+  // Reemplaza los impuestos seleccionados de una línea por una lista nueva
+  // (array de objetos {id, nombre, porcentaje} resueltos desde el catálogo).
+  const cambiarImpuestos = (id, nuevaLista) => {
+    setCarrito((prev) =>
+      prev.map((i) => {
+        if (i.producto_id !== id) return i;
+        const nuevaPorcentaje = nuevaLista.reduce((s, t) => s + Number(t.porcentaje), 0);
+        return { ...i, impuestos: nuevaLista, impuesto_porcentaje: nuevaPorcentaje };
+      })
+    );
+  };
+
   const quitar = (id) => setCarrito((prev) => prev.filter((i) => i.producto_id !== id));
 
   // Descarta toda la venta (tras emitir la factura o al cerrar sesión).
@@ -115,7 +138,8 @@ export const CarritoProvider = ({ children }) => {
 
   // Cálculo de totales de la venta en curso.
   // El impuesto de cada línea se calcula sobre su base reducida
-  // (precio * cantidad - descuento de línea), igual que lo hace el backend.
+  // (precio * cantidad - descuento de línea). Con varios impuestos combinados
+  // cada porcentaje aplica sobre la misma base.
   const totales = useMemo(() => {
     let subtotal = 0;
     let impuesto = 0;
@@ -125,7 +149,11 @@ export const CarritoProvider = ({ children }) => {
       const desc = Math.max(0, Math.min(Number(i.descuento) || 0, bruto));
       subtotal += bruto;
       descuentoLineas += desc;
-      impuesto += (bruto - desc) * (i.impuesto_porcentaje / 100);
+      // Preferir el array de impuestos cuando existe; fallback al legacy impuesto_porcentaje.
+      const lista = Array.isArray(i.impuestos) && i.impuestos.length > 0
+        ? i.impuestos
+        : (i.impuesto_porcentaje ? [{ porcentaje: i.impuesto_porcentaje }] : []);
+      impuesto += lista.reduce((s, t) => s + (bruto - desc) * (Number(t.porcentaje) || 0) / 100, 0);
     }
     const descFactura = Math.max(0, Number(descuento) || 0);
     return {
@@ -177,7 +205,7 @@ export const CarritoProvider = ({ children }) => {
     <CarritoContext.Provider value={{
       carrito, clienteId, tipoPago, descuento, totales,
       setClienteId, setTipoPago, setDescuento,
-      agregar, cambiarCantidad, cambiarDescuento, quitar, vaciar,
+      agregar, cambiarCantidad, cambiarDescuento, cambiarImpuestos, quitar, vaciar,
       anunciarVentaEmitida, anunciarNuevaVenta
     }}>
       {children}

@@ -63,8 +63,11 @@ const generarTicket = (factura, { ancho = '80' } = {}) => {
     nombreLineas.forEach((linea, idx) => {
       lineas.push(idx === 0 ? `${detalle.cantidad} x ${linea}` : `    ${linea}`);
     });
+    const impText = Array.isArray(detalle.impuestos) && detalle.impuestos.length > 0
+      ? detalle.impuestos.map((t) => `${t.nombre || 'Imp'} ${t.porcentaje}%`).join(' + ')
+      : `${detalle.impuesto_porcentaje}%`;
     lineas.push(
-      `    ${formatearMoneda(detalle.precio_unitario)} c/u  IVA ${detalle.impuesto_porcentaje}%`
+      `    ${formatearMoneda(detalle.precio_unitario)} c/u  ${impText}`
     );
     if (Number(detalle.descuento) > 0) {
       lineas.push(`    Descuento: - ${formatearMoneda(detalle.descuento)}`);

@@ -105,7 +105,9 @@ const generarFacturaPDF = (factura, { formato = 'carta' } = {}) =>
       const cantidad = String(detalle.cantidad);
       const totalLinea = formatearMoneda(detalle.subtotal);
       const vlrUnit = formatearMoneda(detalle.precio_unitario);
-      const impPorc = `${detalle.impuesto_porcentaje}%`;
+      const impPorc = Array.isArray(detalle.impuestos) && detalle.impuestos.length > 0
+        ? detalle.impuestos.map((t) => `${Number(t.porcentaje)}%`).join('+')
+        : `${detalle.impuesto_porcentaje}%`;
 
       const envuelto = doc.heightOfString(detalle.producto_nombre, { width: colProd });
       const altoFila = Math.max(altoLinea, envuelto + (esMedia ? 2 : 4));

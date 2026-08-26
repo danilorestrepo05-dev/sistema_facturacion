@@ -13,13 +13,57 @@ import { formatoMoneda } from '../utils/format';
 
 const TIPOS_PAGO = ['efectivo', 'tarjeta', 'transferencia', 'otro'];
 
+// Selector de impuestos por línea de venta: botón que despliega un menú con
+// checkboxes de los impuestos activos del catálogo. Varios se combinan.
+const SelectorImpuestos = ({ impuestos, catalogo, onChange }) => {
+  const [abierto, setAbierto] = useState(false);
+  const [temp, setTemp] = useState([]);
+
+  const abrir = () => { setTemp(impuestos.map((t) => t.id)); setAbierto(true); };
+  const toggle = (id) => setTemp((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  const aplicar = () => {
+    onChange(temp.map((id) => catalogo.find((c) => c.id === id)).filter(Boolean)
+      .map((c) => ({ id: c.id, nombre: c.nombre, porcentaje: Number(c.porcentaje) })));
+    setAbierto(false);
+  };
+
+  const etiqueta = impuestos.length === 0
+    ? 'Sin impuesto'
+    : impuestos.map((t) => `${t.nombre || 'Imp'} ${Number(t.porcentaje)}%`).join(' + ');
+
+  return (
+    <div className="selector-impuestos">
+      <Button size="sm" variant="outline-secondary" className="text-truncate"
+        style={{ minWidth: 90, maxWidth: 180 }} onClick={abierto ? () => setAbierto(false) : abrir}>
+        {etiqueta}
+      </Button>
+      {abierto && (
+        <div className="menu-impuestos" onMouseDown={(e) => e.preventDefault()}>
+          <div className="small fw-semibold mb-2">Seleccionar impuestos</div>
+          {catalogo.map((imp) => (
+            <Form.Check key={imp.id} type="checkbox" size="sm"
+              label={`${imp.nombre} ${imp.porcentaje}%`}
+              checked={temp.includes(imp.id)} onChange={() => toggle(imp.id)} />
+          ))}
+          <div className="d-flex gap-2 mt-2 pt-2 border-top">
+            <Button size="sm" variant="outline-secondary" className="flex-fill"
+              onClick={() => { setTemp([]); }}>Ninguno</Button>
+            <Button size="sm" variant="primary" className="flex-fill"
+              onClick={aplicar}>Aplicar</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Caja = () => {
   // La venta en curso vive en CarritoContext: sobrevive la navegación entre
   // módulos y un refresco de página, y se vacía al cerrar sesión.
   const {
     carrito, clienteId, tipoPago, descuento, totales,
     setClienteId, setTipoPago, setDescuento,
-    agregar, cambiarCantidad, cambiarDescuento, quitar, vaciar,
+    agregar, cambiarCantidad, cambiarDescuento, cambiarImpuestos, quitar, vaciar,
     anunciarVentaEmitida, anunciarNuevaVenta
   } = useCarrito();
 
@@ -35,15 +79,17 @@ const Caja = () => {
 
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
-  const [categorias, setCategorias] = useState([]);
-  // Categoría seleccionada en los chips ('' = todas).
-  const [categoriaFiltro, setCategoriaFiltro] = useState('');
-  // Formato elegido para el PDF de la venta recién emitida.
+  const [impuestos, setImpuestos] = useState([]);
   const [formatoPdf, setFormatoPdf] = useState('media_carta');
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
-  const [termino, setTermino] = useState('');
+  // Autocomplete del buscador de productos.
+  const [terminoBusqueda, setTerminoBusqueda] = useState('');
+  const [indiceActivo, setIndiceActivo] = useState(0);
+  const [abierto, setAbierto] = useState(false);
+  const refBuscador = useRef(null);
+
   const [emitido, setEmitido] = useState(null); // factura emitida (modal)
   const [guardando, setGuardando] = useState(false);
 
@@ -99,14 +145,14 @@ const Caja = () => {
     setCargando(true);
     setError('');
     try {
-      const [respProductos, respClientes, respCategorias] = await Promise.all([
+      const [respProductos, respClientes, respImp] = await Promise.all([
         api.get('/productos', { params: { termino: '' } }),
         api.get('/clientes'),
-        api.get('/categorias')
+        api.get('/impuestos')
       ]);
       setProductos(respProductos.data.datos);
       setClientes(respClientes.data.datos);
-      setCategorias(respCategorias.data.datos);
+      setImpuestos(respImp.data.datos.filter((i) => i.activo === 1));
     } catch (err) {
       setError(err.response?.data?.mensaje || 'Error al cargar los datos de la caja');
     } finally {
@@ -114,19 +160,22 @@ const Caja = () => {
     }
   };
 
-  // Productos visibles según la categoría elegida (chips) y el término de búsqueda.
-  const productosFiltrados = useMemo(() => {
-    const t = termino.trim().toLowerCase();
-    const cat = categoriaFiltro ? Number(categoriaFiltro) : null;
-    return productos.filter(
-      (p) => p.activo === 1 &&
-        (cat === null || p.categoria_id === cat) &&
-        (!t ||
-          p.nombre.toLowerCase().includes(t) ||
-          p.codigo.toLowerCase().includes(t) ||
-          (p.categoria_nombre || '').toLowerCase().includes(t))
-    );
-  }, [productos, termino, categoriaFiltro]);
+  // Resultados del autocomplete: filtra productos por nombre/código/código de
+  // barras/categoría. Solo muestra activos con stock > 0 y máximo 8 opciones.
+  const resultadosBusqueda = useMemo(() => {
+    const t = terminoBusqueda.trim().toLowerCase();
+    if (!t) return [];
+    return productos
+      .filter((p) =>
+        p.activo === 1 &&
+        p.stock_actual > 0 &&
+        (p.nombre || '').toLowerCase().includes(t) ||
+        (p.codigo || '').toLowerCase().includes(t) ||
+        (p.codigo_barras || '').toLowerCase().includes(t) ||
+        (p.categoria_nombre || '').toLowerCase().includes(t)
+      )
+      .slice(0, 8);
+  }, [productos, terminoBusqueda]);
 
   // El descuento total (líneas + adicional) no puede dejar la venta en $0
   // ni en negativo; el backend lo rechaza con 400 como segunda barrera.
@@ -219,7 +268,12 @@ const Caja = () => {
         items: carrito.map((i) => ({
           producto_id: i.producto_id,
           cantidad: i.cantidad,
-          descuento: Number(i.descuento) || 0
+          descuento: Number(i.descuento) || 0,
+          // Envía los ids de los impuestos seleccionados para esta línea;
+          // si el usuario no cambió nada, trae el impuesto por defecto del producto.
+          ...(Array.isArray(i.impuestos) && i.impuestos.length > 0
+            ? { impuestos: i.impuestos.map((t) => t.id) }
+            : {})
         }))
       });
       setEmitido(respuesta.data.datos);
@@ -278,7 +332,11 @@ const Caja = () => {
               <div className="me-2">
                 <div className="fw-semibold small">{item.nombre}</div>
                 <div className="text-secondary small">
-                  {formatoMoneda(item.precio)} × {item.cantidad} (IVA {item.impuesto_porcentaje}%)
+                  {formatoMoneda(item.precio)} × {item.cantidad} · {
+                    Array.isArray(item.impuestos) && item.impuestos.length > 0
+                      ? item.impuestos.map((t) => `${t.nombre || 'Imp'} ${t.porcentaje}%`).join(' + ')
+                      : 'Sin impuesto'
+                  }
                 </div>
               </div>
               <div className="d-flex align-items-center gap-2">
@@ -390,7 +448,7 @@ const Caja = () => {
   );
 
   // Tabla de la venta estilo módulo Ventas de Odoo: cada producto agregado es
-  // una fila (Producto | Cant | P. unitario | Dto $ | Total | ✕) y solo esta
+  // una fila (Producto | Cant | P. unitario | Impuestos | Dto $ | Total | ✕) y solo esta
   // zona scrollea dentro de su columna.
   const tablaVenta = (
     <Card className="card-kpi caja-tarjeta-venta">
@@ -405,6 +463,7 @@ const Caja = () => {
               <th>Producto</th>
               <th>Cant.</th>
               <th className="text-end">P. unitario</th>
+              <th style={{ minWidth: 120 }}>Impuestos</th>
               <th>Dto $</th>
               <th className="text-end">Total</th>
               <th aria-label="Eliminar"></th>
@@ -413,8 +472,8 @@ const Caja = () => {
           <tbody>
             {carrito.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-secondary small py-4 text-center">
-                  Agrega productos para iniciar la venta.
+                <td colSpan={7} className="text-secondary small py-4 text-center">
+                  Busca un producto o escanea el código de barras para iniciar la venta.
                 </td>
               </tr>
             )}
@@ -422,9 +481,6 @@ const Caja = () => {
               <tr key={item.producto_id}>
                 <td>
                   <div className="fw-semibold small">{item.nombre}</div>
-                  <div className="text-secondary" style={{ fontSize: '0.75rem' }}>
-                    IVA {item.impuesto_porcentaje}%
-                  </div>
                 </td>
                 <td>
                   <Form.Control
@@ -435,6 +491,13 @@ const Caja = () => {
                   />
                 </td>
                 <td className="text-end small">{formatoMoneda(item.precio)}</td>
+                <td>
+                  <SelectorImpuestos
+                    impuestos={item.impuestos || []}
+                    catalogo={impuestos}
+                    onChange={(nuevaLista) => cambiarImpuestos(item.producto_id, nuevaLista)}
+                  />
+                </td>
                 <td><CampoDescuento item={item} onCambiar={cambiarDescuento} /></td>
                 <td className="text-end">
                   <strong className="small">
@@ -563,94 +626,91 @@ const Caja = () => {
         )
       )}
 
-      {/* Fila POS: en escritorio cada columna hace scroll por separado */}
-      <Row className="g-3 caja-fila">
-        {/* Columna izquierda: escáner, búsqueda y productos */}
-        <Col lg={7} className="d-flex flex-column caja-col">
-          {escaneoActivo && (
-            <>
-              <InputGroup className="pos-busqueda mb-2">
-                <InputGroup.Text><i className="bi bi-upc-scan"></i></InputGroup.Text>
-                <Form.Control
-                  ref={inputEscaneoRef}
-                  placeholder="Escanear código de barras…"
-                  value={codigoEscaneado}
-                  onChange={(e) => setCodigoEscaneado(e.target.value)}
-                  onKeyDown={teclaEscaneo}
-                />
-                <Button variant="outline-primary" title="Escanear con la cámara"
-                  onClick={() => setCamaraAbierta(true)}>
-                  <i className="bi bi-camera"></i>
-                </Button>
-              </InputGroup>
-              {avisoEscaneo && (
-                <Alert variant="warning" className="py-2 small"
-                  dismissible onClose={() => setAvisoEscaneo('')}>
-                  {avisoEscaneo}
-                </Alert>
-              )}
-            </>
-          )}
-
-          {/* Buscador a lo ancho + tabs de categorias estilo Odoo debajo */}
-          <InputGroup className="pos-busqueda mb-2">
-            <Form.Control
-              placeholder="Buscar por código, nombre o categoría…"
-              value={termino}
-              onChange={(e) => setTermino(e.target.value)}
-            />
-            <Button variant="outline-secondary" onClick={() => setTermino('')}>
-              <i className="bi bi-x-lg"></i>
-            </Button>
-          </InputGroup>
-
-          {/* Tabs de categorías: barra horizontal que se desplaza si sobran,
-              como en el POS de Odoo. Volver a tocar la tab activa la quita. */}
-          {categorias.length > 0 && (
-            <div className="pos-tabs mb-3">
-              <Button size="sm"
-                variant={categoriaFiltro === '' ? 'primary' : 'outline-primary'}
-                className="pos-tab" onClick={() => setCategoriaFiltro('')}>
-                Todas
+      {/* Zona de agregación: escáner + autocomplete estilo Odoo */}
+      <div className="zona-agregar mb-3">
+        {escaneoActivo && (
+          <>
+            <InputGroup className="pos-busqueda mb-2">
+              <InputGroup.Text><i className="bi bi-upc-scan"></i></InputGroup.Text>
+              <Form.Control
+                ref={inputEscaneoRef}
+                placeholder="Escanear código de barras…"
+                value={codigoEscaneado}
+                onChange={(e) => setCodigoEscaneado(e.target.value)}
+                onKeyDown={teclaEscaneo}
+              />
+              <Button variant="outline-primary" title="Escanear con la cámara"
+                onClick={() => setCamaraAbierta(true)}>
+                <i className="bi bi-camera"></i>
               </Button>
-              {categorias.filter((c) => c.activo === 1).map((c) => (
-                <Button key={c.id} size="sm"
-                  variant={categoriaFiltro === String(c.id) ? 'primary' : 'outline-primary'}
-                  className="pos-tab"
-                  onClick={() => setCategoriaFiltro(categoriaFiltro === String(c.id) ? '' : String(c.id))}>
-                  {c.nombre}
-                </Button>
+            </InputGroup>
+            {avisoEscaneo && (
+              <Alert variant="warning" className="py-2 small"
+                dismissible onClose={() => setAvisoEscaneo('')}>
+                {avisoEscaneo}
+              </Alert>
+            )}
+          </>
+        )}
+
+        <div className="pos-buscador-productos">
+          <InputGroup>
+            <InputGroup.Text><i className="bi bi-search"></i></InputGroup.Text>
+            <Form.Control
+              ref={refBuscador}
+              placeholder="Buscar producto por nombre, código o categoría…"
+              value={terminoBusqueda}
+              onChange={(e) => { setTerminoBusqueda(e.target.value); setIndiceActivo(0); setAbierto(true); }}
+              onFocus={() => terminoBusqueda && setAbierto(true)}
+              onBlur={() => { setTimeout(() => setAbierto(false), 150); }}
+              onKeyDown={(e) => {
+                if (!abierto || resultadosBusqueda.length === 0) return;
+                if (e.key === 'ArrowDown') { e.preventDefault(); setIndiceActivo((i) => Math.min(i + 1, resultadosBusqueda.length - 1)); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); setIndiceActivo((i) => Math.max(i - 1, 0)); }
+                else if (e.key === 'Enter' && resultadosBusqueda[indiceActivo]) {
+                  e.preventDefault();
+                  agregar(resultadosBusqueda[indiceActivo]);
+                  setTerminoBusqueda(''); setAbierto(false);
+                  refBuscador.current?.focus();
+                } else if (e.key === 'Escape') { setAbierto(false); }
+              }}
+            />
+            {terminoBusqueda && (
+              <Button variant="outline-secondary"
+                onClick={() => { setTerminoBusqueda(''); refBuscador.current?.focus(); }}>
+                <i className="bi bi-x-lg"></i>
+              </Button>
+            )}
+          </InputGroup>
+          {abierto && resultadosBusqueda.length > 0 && (
+            <div className="lista-autocompleta">
+              {resultadosBusqueda.map((p, idx) => (
+                <button key={p.id} type="button"
+                  className={`opcion-autocompleta${idx === indiceActivo ? ' activa' : ''}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    agregar(p);
+                    setTerminoBusqueda(''); setAbierto(false);
+                    refBuscador.current?.focus();
+                  }}>
+                  <div className="fw-semibold small">{p.nombre}</div>
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-secondary" style={{ fontSize: '0.75rem' }}>
+                      {p.codigo}{p.categoria_nombre ? ` · ${p.categoria_nombre}` : ''}
+                    </span>
+                    <span className="text-primary fw-bold small">{formatoMoneda(p.precio_venta)}</span>
+                  </div>
+                </button>
               ))}
             </div>
           )}
+        </div>
+      </div>
 
-          <div className="row g-2 caja-listado">
-            {productosFiltrados.length === 0 && (
-              <p className="text-secondary">Sin productos disponibles.</p>
-            )}
-            {productosFiltrados.map((p) => (
-              <div key={p.id} className="col-6 col-md-3 col-xl-2">
-                <Card className="pos-tarjeta-producto" onClick={() => agregar(p)}>
-                  <Card.Body className="p-2 text-center">
-                    <div className="small text-truncate fw-semibold">{p.nombre}</div>
-                    <div className="text-primary fw-bold">{formatoMoneda(p.precio_venta)}</div>
-                    <Badge pill bg={p.stock_actual > 0 ? 'success' : 'danger'}>
-                      {p.stock_actual} uds
-                    </Badge>
-                  </Card.Body>
-                </Card>
-              </div>
-            ))}
-          </div>
-        </Col>
-
-        {/* Columna derecha: tabla de la venta (solo escritorio; en móvil hay botón flotante) */}
-        <Col lg={5} className="d-none d-lg-flex flex-column caja-col">
-          <div className="caja-panel">
-            {tablaVenta}
-          </div>
-        </Col>
-      </Row>
+      {/* Tabla de la venta: scrollea solo su contenido en escritorio */}
+      <div className="caja-zona-tabla">
+        {tablaVenta}
+      </div>
 
       {/* Barra inferior fija con los controles y totales de la venta */}
       {barraInferior}

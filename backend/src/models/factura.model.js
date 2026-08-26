@@ -115,6 +115,20 @@ const buscarPorId = async (id) => {
     [id]
   );
 
+  // Adjunta el desglose de impuestos de cada línea (uno o varios por ítem).
+  if (detalles.length > 0) {
+    const [impuestosFilas] = await pool.query(
+      `SELECT detalle_id, impuesto_id AS id, nombre, porcentaje, base, valor
+       FROM detalle_impuestos WHERE detalle_id IN (?) ORDER BY id`,
+      [detalles.map((d) => d.id)]
+    );
+    const mapaImpuestos = {};
+    impuestosFilas.forEach((f) => {
+      (mapaImpuestos[f.detalle_id] ??= []).push(f);
+    });
+    detalles.forEach((d) => { d.impuestos = mapaImpuestos[d.id] || []; });
+  }
+
   return { ...factura[0], detalles };
 };
 
@@ -155,9 +169,12 @@ const crear = async (datos, usuarioId) => {
     const lineas = [];
     for (const item of items) {
       const [productos] = await conexion.query(
-        `SELECT id, nombre, precio_venta, impuesto_id, stock_actual,
-                (SELECT porcentaje FROM impuestos WHERE id = productos.impuesto_id) AS impuesto_porcentaje
-         FROM productos WHERE id = ? AND activo = 1 FOR UPDATE`,
+        `SELECT p.id, p.nombre, p.precio_venta, p.impuesto_id, i.nombre AS impuesto_nombre,
+                p.stock_actual, i.porcentaje AS impuesto_porcentaje
+         FROM productos p
+         LEFT JOIN impuestos i ON i.id = p.impuesto_id
+         WHERE p.id = ? AND p.activo = 1
+         FOR UPDATE`,
         [item.producto_id]
       );
 
@@ -172,7 +189,6 @@ const crear = async (datos, usuarioId) => {
         );
       }
 
-      const porcentaje = Number(producto.impuesto_porcentaje || 0);
       const importeBase = Number(producto.precio_venta) * item.cantidad;
 
       // Descuento de la línea: monto en $, no puede superar el valor de la línea.
@@ -184,8 +200,47 @@ const crear = async (datos, usuarioId) => {
         );
       }
 
+      // Impuestos de la línea:
+      // - Si el cliente envía el arreglo "impuestos" con ids del catálogo se usan
+      //   TODOS esos impuestos combinados sobre la misma base (estilo Odoo/DIAN).
+      // - Arreglo vacío = línea sin impuestos (exenta a propósito).
+      // - Sin arreglo = comportamiento histórico: el impuesto configurado del producto.
+      let impuestosLinea;
+      if (Array.isArray(item.impuestos)) {
+        const ids = [...new Set(item.impuestos.map((x) => Number(x)))].filter(Number.isInteger);
+        if (ids.length > 0) {
+          const [filas] = await conexion.query(
+            'SELECT id, nombre, porcentaje FROM impuestos WHERE id IN (?) AND activo = 1',
+            [ids]
+          );
+          if (filas.length !== ids.length) {
+            throw Object.assign(
+              new Error('Algún impuesto indicado no existe o está inactivo'),
+              { status: 400 }
+            );
+          }
+          impuestosLinea = filas.map((f) => ({ ...f }));
+        } else {
+          impuestosLinea = [];
+        }
+      } else if (producto.impuesto_porcentaje !== null && producto.impuesto_porcentaje !== undefined) {
+        impuestosLinea = [{
+          id: producto.impuesto_id,
+          nombre: producto.impuesto_nombre || '',
+          porcentaje: Number(producto.impuesto_porcentaje)
+        }];
+      } else {
+        impuestosLinea = [];
+      }
+
       // El impuesto se calcula sobre la base reducida (DIAN-friendly).
-      const impuestoLinea = (importeBase - descuentoLinea) * (porcentaje / 100);
+      // Con varios impuestos cada uno aplica su porcentaje sobre la MISMA base.
+      const baseGravable = importeBase - descuentoLinea;
+      let impuestoLinea = 0;
+      for (const t of impuestosLinea) {
+        t.valor = baseGravable * (Number(t.porcentaje) / 100);
+        impuestoLinea += t.valor;
+      }
 
       lineas.push({
         producto_id: producto.id,
@@ -193,9 +248,13 @@ const crear = async (datos, usuarioId) => {
         cantidad: item.cantidad,
         precio_unitario: producto.precio_venta,
         descuento: descuentoLinea,
-        impuesto_porcentaje: porcentaje,
+        // Compatibilidad: en detalles_factura se guarda la suma de los porcentajes
+        // (matemáticamente equivale a aplicarlos todos sobre la misma base).
+        impuesto_porcentaje: impuestosLinea.reduce((s, t) => s + Number(t.porcentaje), 0),
         impuesto: impuestoLinea,
-        subtotal_linea: importeBase
+        subtotal_linea: importeBase,
+        base_gravable: baseGravable,
+        desglose_impuestos: impuestosLinea
       });
 
       subtotal += importeBase;
@@ -232,9 +291,10 @@ const crear = async (datos, usuarioId) => {
 
     const facturaId = factura.insertId;
 
-    // Inserta las líneas de detalle y los movimientos de salida de inventario.
+    // Inserta las líneas de detalle, su desglose de impuestos y los
+    // movimientos de salida de inventario.
     for (const linea of lineas) {
-      await conexion.query(
+      const [detalleNuevo] = await conexion.query(
         `INSERT INTO detalles_factura
            (factura_id, producto_id, producto_nombre, cantidad, precio_unitario, descuento,
             impuesto_porcentaje, impuesto, subtotal)
@@ -243,6 +303,18 @@ const crear = async (datos, usuarioId) => {
          linea.precio_unitario, linea.descuento, linea.impuesto_porcentaje,
          linea.impuesto, linea.subtotal_linea]
       );
+
+      // Desglose por impuesto de la línea (uno o varios combinados).
+      if (linea.desglose_impuestos.length > 0) {
+        await conexion.query(
+          `INSERT INTO detalle_impuestos (detalle_id, impuesto_id, nombre, porcentaje, base, valor)
+           VALUES ?`,
+          [linea.desglose_impuestos.map((t) => [
+            detalleNuevo.insertId, t.id, t.nombre || '', Number(t.porcentaje),
+            linea.base_gravable, t.valor
+          ])]
+        );
+      }
 
       await conexion.query(
         `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, motivo, referencia_id)

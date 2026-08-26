@@ -186,69 +186,33 @@ body {
     min-height: 0;
   }
 
-  /* Sin wrap en la fila del POS: los contenedores flex con wrap estiran cada
-     línea al tamaño de su contenido y por eso las columnas seguían creciendo.
-     En una sola línea, el stretch sí les da altura definida (la del panel). */
-  html.pos-activo .caja-fila {
-    flex-wrap: nowrap;
-  }
-
+  /* La vista Caja ahora es un flex column: zona-agregar + tabla + barra.
+     La tabla ocupa el espacio restante y scrollea por dentro. */
   .vista-caja {
     flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     min-height: 0;
-  }
-
-  .caja-fila {
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-
-  .caja-col {
-    min-height: 0;
     overflow: hidden;
   }
 
-  /* Listado de productos: ocupa el espacio restante de su columna.
-     align-content impide que las filas del grid se estiren cuando sobra espacio
-     vertical (las tarjetas mantienen su altura natural). */
-  .caja-listado {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    align-content: flex-start;
-  }
-
-  /* Panel del carrito: puede encoger por debajo de su contenido y scrollea */
-  .caja-panel {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  /* Dentro del panel solo scrollea la lista de ítems; el pie con cliente,
-     tipo de pago, descuento, totales y Cobrar queda siempre visible. */
-  html.pos-activo .caja-panel .caja-tarjeta-venta {
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-
-  html.pos-activo .caja-panel .caja-panel-lista {
+  /* Zona de tabla que scrollea: toma todo el espacio que sobra */
+  .caja-zona-tabla {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
   }
 
-  html.pos-activo .caja-panel .caja-panel-pie {
-    flex: 0 0 auto;
+  /* Dentro de la tabla scrolleable solo la lista de ítems, el encabezado
+     se queda fijo arriba con sticky. */
+  html.pos-activo .caja-zona-tabla .caja-panel-lista {
+    overflow-y: auto;
+    min-height: 0;
+    flex: 1 1 auto;
   }
 
-  /* Barra inferior fija estilo Odoo Ventas: vive fuera del Row, ocupa todo
-     el ancho y roba un alto fijo; la fila del POS absorbe el resto. Sin
-     flex-shrink:0 los controles se aplastarían cuando falta espacio. */
+  /* Barra inferior fija estilo Odoo Ventas: vive fuera de la tabla, ocupa todo
+     el ancho y roba un alto fijo; el flex column absorbe el resto. */
   .pos-barra-inferior {
     display: flex;
     flex-wrap: wrap;
@@ -260,14 +224,12 @@ body {
     flex-shrink: 0;
   }
 
-  /* Grupo de selects/inputs a la izquierda de la barra */
   .pos-barra-filtros {
     display: flex;
     align-items: flex-end;
     gap: 0.75rem;
   }
 
-  /* Grupo de totales + Cobrar pegado al borde derecho */
   .pos-barra-totales {
     display: flex;
     align-items: center;
@@ -276,12 +238,13 @@ body {
   }
 }
 
-/* La tarjeta de venta se apila en dos zonas (lista + pie). En escritorio el
-   bloque anterior acota las alturas; en móvil fluyen de forma natural. */
+/* La tarjeta de venta se apila en dos zonas (lista + pie). En escritorio la
+   tabla llena el espacio restante; en móvil fluye de forma natural. */
 .caja-tarjeta-venta {
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* recorta el fondo del pie en las esquinas redondeadas */
+  overflow: hidden;
+  height: 100%;
 }
 
 /* Pie fijo de la venta con fondo diferenciado: un gris un paso más marcado
@@ -290,23 +253,6 @@ body {
 .caja-panel-pie {
   background-color: var(--bs-secondary-bg);
   border-top: 1px solid var(--bs-border-color);
-}
-
-/* Tabs de categorías estilo Odoo: barra horizontal que se desplaza si sobran.
-   Comparte el flex-shrink:0 del buscador para que nunca se aplaste cuando la
-   ventana baja de alto; el grid absorbe el ajuste con su propio scroll. */
-.pos-tabs {
-  display: flex;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
-  flex-shrink: 0;
-}
-
-.pos-tab {
-  white-space: nowrap;
-  flex: 0 0 auto;
-  padding: 0.35rem 0.9rem;
 }
 
 /* El buscador vive en una columna flexible de altura fija:
@@ -346,6 +292,67 @@ html.pos-activo *::-webkit-scrollbar-thumb {
 html.pos-activo *::-webkit-scrollbar-thumb:hover,
 html.pos-activo *::-webkit-scrollbar-thumb:active {
   background: rgba(108, 117, 125, 0.65);
+}
+
+/* Zona de búsqueda y tabla: sin margen extra en escritorio */
+.zona-agregar { flex-shrink: 0; }
+
+/* Autocomplete del buscador de productos */
+.pos-buscador-productos { position: relative; }
+
+.pos-buscador-productos .form-control { min-width: 0; }
+
+.lista-autocompleta {
+  position: absolute;
+  left: 0; right: 0;
+  top: 100%;
+  z-index: 1050;
+  background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0 0 var(--bs-border-radius) var(--bs-border-radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.opcion-autocompleta {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+.opcion-autocompleta:last-child { border-bottom: none; }
+.opcion-autocompleta.activa,
+.opcion-autocompleta:hover {
+  background: var(--bs-primary-bg-subtle);
+}
+
+/* Selector de impuestos por línea */
+.selector-impuestos { position: relative; }
+
+.menu-impuestos {
+  position: absolute;
+  left: 0; top: 100%;
+  z-index: 1055;
+  background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  padding: 0.75rem;
+  min-width: 210px;
+  max-width: 280px;
+}
+
+/* Encabezado de la tabla sticky dentro de la zona scrolleable */
+.tabla-venta thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bs-tertiary-bg);
 }
 
 /* Botón flotante que abre el carrito en pantallas pequeñas

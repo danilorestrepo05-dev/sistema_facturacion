@@ -165,6 +165,20 @@ function validarCreacion(datos) {
         (Number.isNaN(Number(item.descuento)) || Number(item.descuento) < 0)) {
       return 'El descuento de cada item debe ser un número mayor o igual a 0';
     }
+
+    // Impuestos de la línea: opcional; si se envía debe ser un arreglo de ids
+    // numéricos positivos (varios impuestos combinados estilo Odoo/DIAN).
+    if (item.impuestos !== undefined && item.impuestos !== null) {
+      if (!Array.isArray(item.impuestos)) {
+        return 'impuestos de cada item debe ser un arreglo de ids';
+      }
+      if (item.impuestos.some((x) => !Number.isInteger(Number(x)) || Number(x) <= 0)) {
+        return 'Cada impuesto debe ser un id numérico válido';
+      }
+      if (item.impuestos.length > 10) {
+        return 'Un mismo producto no puede superar 10 impuestos combinados';
+      }
+    }
   }
 
   return null;
