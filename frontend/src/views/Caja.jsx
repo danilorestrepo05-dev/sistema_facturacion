@@ -38,6 +38,8 @@ const Caja = () => {
   const [categorias, setCategorias] = useState([]);
   // Categoría seleccionada en los chips ('' = todas).
   const [categoriaFiltro, setCategoriaFiltro] = useState('');
+  // Formato elegido para el PDF de la venta recién emitida.
+  const [formatoPdf, setFormatoPdf] = useState('media_carta');
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
@@ -446,21 +448,8 @@ const Caja = () => {
             </>
           )}
 
-          {/* Buscador + filtro de categoría en una sola fila: el select escala
-              sin importar cuántas categorías existan. */}
-          <InputGroup className="pos-busqueda mb-3">
-            {categorias.length > 0 && (
-              <Form.Select
-                className="caja-select-categoria"
-                aria-label="Filtrar por categoría"
-                value={categoriaFiltro}
-                onChange={(e) => setCategoriaFiltro(e.target.value)}>
-                <option value="">Todas las categorías</option>
-                {categorias.filter((c) => c.activo === 1).map((c) => (
-                  <option key={c.id} value={String(c.id)}>{c.nombre}</option>
-                ))}
-              </Form.Select>
-            )}
+          {/* Buscador a lo ancho + tabs de categorias estilo Odoo debajo */}
+          <InputGroup className="pos-busqueda mb-2">
             <Form.Control
               placeholder="Buscar por código, nombre o categoría…"
               value={termino}
@@ -471,12 +460,32 @@ const Caja = () => {
             </Button>
           </InputGroup>
 
+          {/* Tabs de categorías: barra horizontal que se desplaza si sobran,
+              como en el POS de Odoo. Volver a tocar la tab activa la quita. */}
+          {categorias.length > 0 && (
+            <div className="pos-tabs mb-3">
+              <Button size="sm"
+                variant={categoriaFiltro === '' ? 'primary' : 'outline-primary'}
+                className="pos-tab" onClick={() => setCategoriaFiltro('')}>
+                Todas
+              </Button>
+              {categorias.filter((c) => c.activo === 1).map((c) => (
+                <Button key={c.id} size="sm"
+                  variant={categoriaFiltro === String(c.id) ? 'primary' : 'outline-primary'}
+                  className="pos-tab"
+                  onClick={() => setCategoriaFiltro(categoriaFiltro === String(c.id) ? '' : String(c.id))}>
+                  {c.nombre}
+                </Button>
+              ))}
+            </div>
+          )}
+
           <div className="row g-2 caja-listado">
             {productosFiltrados.length === 0 && (
               <p className="text-secondary">Sin productos disponibles.</p>
             )}
             {productosFiltrados.map((p) => (
-              <div key={p.id} className="col-6 col-md-4 col-xl-3">
+              <div key={p.id} className="col-6 col-md-3 col-xl-2">
                 <Card className="pos-tarjeta-producto" onClick={() => agregar(p)}>
                   <Card.Body className="p-2 text-center">
                     <div className="small text-truncate fw-semibold">{p.nombre}</div>
@@ -534,7 +543,13 @@ const Caja = () => {
           <Button variant="outline-primary" onClick={() => imprimir('ticket', 80)}>
             <i className="bi bi-printer me-1"></i>Ticket POS
           </Button>
-          <Button variant="outline-secondary" onClick={() => imprimir('pdf', 'media_carta')}>
+          {/* El PDF puede salir en media carta (rápida, mitad de hoja) o carta */}
+          <Form.Select size="sm" style={{ width: 'auto' }} aria-label="Formato del PDF"
+            value={formatoPdf} onChange={(e) => setFormatoPdf(e.target.value)}>
+            <option value="media_carta">Media carta</option>
+            <option value="carta">Carta</option>
+          </Form.Select>
+          <Button variant="outline-secondary" onClick={() => imprimir('pdf', formatoPdf)}>
             <i className="bi bi-file-earmark-pdf me-1"></i>PDF
           </Button>
           <Button variant="success" onClick={cerrarModalEmitido}>Nueva venta</Button>

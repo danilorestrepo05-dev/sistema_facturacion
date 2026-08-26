@@ -23,6 +23,8 @@ const Facturas = () => {
   const [numero, setNumero] = useState('');
   const [cliente, setCliente] = useState('');
   const [estado, setEstado] = useState('');
+  // Formato elegido para descargar/imprimir los PDF de facturas.
+  const [formatoPdf, setFormatoPdf] = useState('carta');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
 
@@ -122,6 +124,14 @@ const Facturas = () => {
               onChange={(e) => setFechaDesde(e.target.value)} /></Col>
             <Col md={2}><Form.Control size="sm" type="date" value={fechaHasta}
               onChange={(e) => setFechaHasta(e.target.value)} /></Col>
+            {/* Formato con el que saldrán los PDF de esta vista */}
+            <Col md={2}>
+              <Form.Select size="sm" aria-label="Formato del PDF"
+                value={formatoPdf} onChange={(e) => setFormatoPdf(e.target.value)}>
+                <option value="media_carta">PDF: media carta</option>
+                <option value="carta">PDF: carta</option>
+              </Form.Select>
+            </Col>
             <Col md={1}>
               <Button size="sm" variant="primary" className="w-100" onClick={() => cargar(true)}>
                 <i className="bi bi-search"></i>
@@ -173,7 +183,7 @@ const Facturas = () => {
                       <Button size="sm" variant="outline-dark" onClick={() => imprimir('ticket', f.id, 80)}>
                         <i className="bi bi-printer"></i>
                       </Button>{' '}
-                      <Button size="sm" variant="outline-danger" onClick={() => imprimir('pdf', f.id, 'carta')}>
+                      <Button size="sm" variant="outline-danger" onClick={() => imprimir('pdf', f.id, formatoPdf)}>
                         <i className="bi bi-file-earmark-pdf"></i>
                       </Button>{' '}
                       {esAdmin && f.estado === 'emitida' && (
@@ -250,7 +260,7 @@ const Facturas = () => {
           <Button variant="outline-dark" onClick={() => imprimir('ticket', detalle?.id, 80)}>
             <i className="bi bi-printer me-1"></i>Ticket
           </Button>
-          <Button variant="outline-primary" onClick={() => imprimir('pdf', detalle?.id, 'carta')}>
+          <Button variant="outline-primary" onClick={() => imprimir('pdf', detalle?.id, formatoPdf)}>
             <i className="bi bi-file-earmark-pdf me-1"></i>PDF carta
           </Button>
           {esAdmin && detalle?.estado === 'emitida' && (

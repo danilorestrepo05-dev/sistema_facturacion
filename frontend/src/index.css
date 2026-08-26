@@ -263,13 +263,21 @@ body {
   border-top: 1px solid var(--bs-border-color);
 }
 
-/* Select de categorías dentro del buscador del POS: ancho fijo para que
-   el campo de texto conserve el resto de la fila sin importar cuántas
-   categorías existan. La especificidad extra vence al flex de Bootstrap
-   para hijos de .input-group. */
-.pos-busqueda .caja-select-categoria {
+/* Tabs de categorías estilo Odoo: barra horizontal que se desplaza si sobran.
+   Comparte el flex-shrink:0 del buscador para que nunca se aplaste cuando la
+   ventana baja de alto; el grid absorbe el ajuste con su propio scroll. */
+.pos-tabs {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  flex-shrink: 0;
+}
+
+.pos-tab {
+  white-space: nowrap;
   flex: 0 0 auto;
-  width: 150px;
+  padding: 0.35rem 0.9rem;
 }
 
 /* El buscador vive en una columna flexible de altura fija:
@@ -279,7 +287,7 @@ body {
   flex-shrink: 0;
 }
 
-/* El campo de texto puede encoger para dejar sitio al select en pantallas angostas */
+/* El campo de texto puede encoger en pantallas angostas sin cortarse */
 .pos-busqueda .form-control {
   min-width: 0;
 }

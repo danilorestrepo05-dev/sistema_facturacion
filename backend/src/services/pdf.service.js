@@ -118,12 +118,14 @@ const generarFacturaPDF = (factura, { formato = 'carta' } = {}) =>
 
       y += altoFila;
 
-      // Nota de descuento de la línea (bajo la fila, en gris pequeño).
+      // Nota de descuento de la línea: se dibuja pegada al total de SU fila y
+      // con aire extra antes de la siguiente, para que agrupe hacia arriba
+      // (su producto) y no parezca pertenecer a la fila de abajo.
       if (Number(detalle.descuento) > 0) {
         doc.font('Helvetica').fontSize(tPequena).fillColor('#777777')
           .text(`Descuento: - ${formatearMoneda(detalle.descuento)}`, xTotal, y, { width: colTotal, align: 'right' });
         doc.font('Helvetica').fontSize(tNormal).fillColor('#333333');
-        y += esMedia ? 8 : 10;
+        y += esMedia ? 12 : 16;
       }
     });
 
