@@ -40,13 +40,40 @@ const buscarPorId = async (id) => {
   return filas[0] || null;
 };
 
-// Busca un usuario por su nombre de usuario (para el login, incluye el hash).
+// Busca un usuario por su nombre de usuario (para el login, incluye el hash
+// y los campos de control de intentos fallidos / bloqueo).
 const buscarPorNombreUsuario = async (nombreUsuario) => {
   const [filas] = await pool.query(
-    'SELECT id, nombre_usuario, nombre_completo, password_hash, rol, activo FROM usuarios WHERE nombre_usuario = ?',
+    `SELECT id, nombre_usuario, nombre_completo, password_hash, rol, activo,
+            intentos_fallidos, bloqueado_hasta
+     FROM usuarios WHERE nombre_usuario = ?`,
     [nombreUsuario]
   );
   return filas[0] || null;
+};
+
+// Incrementa el contador de intentos fallidos de un usuario.
+const registrarIntentoFallido = async (id) => {
+  await pool.query(
+    'UPDATE usuarios SET intentos_fallidos = intentos_fallidos + 1 WHERE id = ?',
+    [id]
+  );
+};
+
+// Reinicia el contador de intentos fallidos tras un login exitoso.
+const reiniciarIntentos = async (id) => {
+  await pool.query(
+    'UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = ?',
+    [id]
+  );
+};
+
+// Bloquea el login de un usuario durante el número de minutos indicado.
+const bloquearLogin = async (id, minutos) => {
+  await pool.query(
+    'UPDATE usuarios SET bloqueado_hasta = DATE_ADD(NOW(), INTERVAL ? MINUTE) WHERE id = ?',
+    [minutos, id]
+  );
 };
 
 // Crea un nuevo usuario y devuelve el registro creado.
@@ -96,6 +123,9 @@ module.exports = {
   contar,
   buscarPorId,
   buscarPorNombreUsuario,
+  registrarIntentoFallido,
+  reiniciarIntentos,
+  bloquearLogin,
   crear,
   actualizar,
   desactivar,
