@@ -14,42 +14,76 @@ import { formatoMoneda } from '../utils/format';
 const TIPOS_PAGO = ['efectivo', 'tarjeta', 'transferencia', 'otro'];
 
 // Selector de impuestos por línea de venta: botón que despliega un menú con
-// checkboxes de los impuestos activos del catálogo. Varios se combinan.
+// checkboxes de los impuestos activos del catálogo. Cualquier cambio se aplica
+// de inmediato sin necesidad de botón "Aplicar" (UX tipo Odoo).
 const SelectorImpuestos = ({ impuestos, catalogo, onChange }) => {
   const [abierto, setAbierto] = useState(false);
-  const [temp, setTemp] = useState([]);
+  const ref = useRef(null);
 
-  const abrir = () => { setTemp(impuestos.map((t) => t.id)); setAbierto(true); };
-  const toggle = (id) => setTemp((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
-  const aplicar = () => {
-    onChange(temp.map((id) => catalogo.find((c) => c.id === id)).filter(Boolean)
+  useEffect(() => {
+    if (!abierto) return;
+    const cerrar = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setAbierto(false);
+    };
+    document.addEventListener('mousedown', cerrar);
+    return () => document.removeEventListener('mousedown', cerrar);
+  }, [abierto]);
+
+  const idsActuales = impuestos.map((t) => t.id);
+  const hayExento = impuestos.some((t) => Number(t.porcentaje) === 0);
+  const hayGravado = impuestos.some((t) => Number(t.porcentaje) > 0);
+
+  const toggle = (id) => {
+    const imp = catalogo.find((c) => c.id === id);
+    if (!imp) return;
+    const esExento = Number(imp.porcentaje) === 0;
+
+    let nueva;
+    if (idsActuales.includes(id)) {
+      nueva = idsActuales.filter((x) => x !== id);
+    } else if (esExento) {
+      nueva = [id];
+    } else {
+      nueva = [...idsActuales.filter((x) => {
+        const c = catalogo.find((cat) => cat.id === x);
+        return c && Number(c.porcentaje) > 0;
+      }), id];
+    }
+
+    onChange(nueva.map((i) => catalogo.find((c) => c.id === i)).filter(Boolean)
       .map((c) => ({ id: c.id, nombre: c.nombre, porcentaje: Number(c.porcentaje) })));
-    setAbierto(false);
   };
 
   const etiqueta = impuestos.length === 0
     ? 'Sin impuesto'
-    : impuestos.map((t) => `${t.nombre || 'Imp'} ${Number(t.porcentaje)}%`).join(' + ');
+    : impuestos.map((t) => `${t.nombre} ${Number(t.porcentaje)}%`).join(' + ');
 
   return (
-    <div className="selector-impuestos">
+    <div className="selector-impuestos" ref={ref}>
       <Button size="sm" variant="outline-secondary" className="text-truncate"
-        style={{ minWidth: 90, maxWidth: 180 }} onClick={abierto ? () => setAbierto(false) : abrir}>
+        style={{ minWidth: 90, maxWidth: 180 }} onClick={() => setAbierto((a) => !a)}>
         {etiqueta}
       </Button>
       {abierto && (
-        <div className="menu-impuestos" onMouseDown={(e) => e.preventDefault()}>
+        <div className="menu-impuestos"
+          onMouseDown={(e) => e.preventDefault()}>
           <div className="small fw-semibold mb-2">Seleccionar impuestos</div>
-          {catalogo.map((imp) => (
-            <Form.Check key={imp.id} type="checkbox" size="sm"
-              label={`${imp.nombre} ${imp.porcentaje}%`}
-              checked={temp.includes(imp.id)} onChange={() => toggle(imp.id)} />
-          ))}
-          <div className="d-flex gap-2 mt-2 pt-2 border-top">
-            <Button size="sm" variant="outline-secondary" className="flex-fill"
-              onClick={() => { setTemp([]); }}>Ninguno</Button>
-            <Button size="sm" variant="primary" className="flex-fill"
-              onClick={aplicar}>Aplicar</Button>
+          {catalogo.map((imp) => {
+            const esExento = Number(imp.porcentaje) === 0;
+            const deshabilitado = esExento ? hayGravado : hayExento;
+            return (
+              <Form.Check key={imp.id} type="checkbox" size="sm"
+                label={`${imp.nombre} ${Number(imp.porcentaje)}%`}
+                checked={idsActuales.includes(imp.id)}
+                disabled={deshabilitado}
+                onChange={() => toggle(imp.id)} />
+            );
+          })}
+          <div className="pt-2 mt-2 border-top">
+            <Button size="sm" variant="outline-secondary" className="w-100"
+              onClick={() => { onChange([]); setAbierto(false); }}>
+              Sin impuestos (exento)
+            </Button>
           </div>
         </div>
       )}
@@ -80,9 +114,11 @@ const Caja = () => {
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [impuestos, setImpuestos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
   const [formatoPdf, setFormatoPdf] = useState('media_carta');
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [categoriaFiltro, setCategoriaFiltro] = useState('');
 
   // Autocomplete del buscador de productos.
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
@@ -145,14 +181,16 @@ const Caja = () => {
     setCargando(true);
     setError('');
     try {
-      const [respProductos, respClientes, respImp] = await Promise.all([
+      const [respProductos, respClientes, respImp, respCat] = await Promise.all([
         api.get('/productos', { params: { termino: '' } }),
         api.get('/clientes'),
-        api.get('/impuestos')
+        api.get('/impuestos'),
+        api.get('/categorias')
       ]);
       setProductos(respProductos.data.datos);
       setClientes(respClientes.data.datos);
       setImpuestos(respImp.data.datos.filter((i) => i.activo === 1));
+      setCategorias(respCat.data.datos);
     } catch (err) {
       setError(err.response?.data?.mensaje || 'Error al cargar los datos de la caja');
     } finally {
@@ -161,21 +199,25 @@ const Caja = () => {
   };
 
   // Resultados del autocomplete: filtra productos por nombre/código/código de
-  // barras/categoría. Solo muestra activos con stock > 0 y máximo 8 opciones.
+  // barras/categoría y por la categoría seleccionada (si hay). Solo activos con
+  // stock > 0, máximo 8 opciones.
   const resultadosBusqueda = useMemo(() => {
     const t = terminoBusqueda.trim().toLowerCase();
-    if (!t) return [];
+    if (!t && !categoriaFiltro) return [];
+    const cat = categoriaFiltro ? Number(categoriaFiltro) : null;
     return productos
       .filter((p) =>
         p.activo === 1 &&
         p.stock_actual > 0 &&
-        (p.nombre || '').toLowerCase().includes(t) ||
-        (p.codigo || '').toLowerCase().includes(t) ||
-        (p.codigo_barras || '').toLowerCase().includes(t) ||
-        (p.categoria_nombre || '').toLowerCase().includes(t)
+        (cat === null || p.categoria_id === cat) &&
+        (!t ||
+          (p.nombre || '').toLowerCase().includes(t) ||
+          (p.codigo || '').toLowerCase().includes(t) ||
+          (p.codigo_barras || '').toLowerCase().includes(t) ||
+          (p.categoria_nombre || '').toLowerCase().includes(t))
       )
       .slice(0, 8);
-  }, [productos, terminoBusqueda]);
+  }, [productos, terminoBusqueda, categoriaFiltro]);
 
   // El descuento total (líneas + adicional) no puede dejar la venta en $0
   // ni en negativo; el backend lo rechaza con 400 como segunda barrera.
@@ -270,8 +312,8 @@ const Caja = () => {
           cantidad: i.cantidad,
           descuento: Number(i.descuento) || 0,
           // Envía los ids de los impuestos seleccionados para esta línea;
-          // si el usuario no cambió nada, trae el impuesto por defecto del producto.
-          ...(Array.isArray(i.impuestos) && i.impuestos.length > 0
+          // [] = exento a propósito; undefined = fallback al impuesto del producto.
+          ...(Array.isArray(i.impuestos)
             ? { impuestos: i.impuestos.map((t) => t.id) }
             : {})
         }))
@@ -334,7 +376,7 @@ const Caja = () => {
                 <div className="text-secondary small">
                   {formatoMoneda(item.precio)} × {item.cantidad} · {
                     Array.isArray(item.impuestos) && item.impuestos.length > 0
-                      ? item.impuestos.map((t) => `${t.nombre || 'Imp'} ${t.porcentaje}%`).join(' + ')
+                      ? item.impuestos.map((t) => `${t.nombre} ${Number(t.porcentaje)}%`).join(' + ')
                       : 'Sin impuesto'
                   }
                 </div>
@@ -653,8 +695,8 @@ const Caja = () => {
           </>
         )}
 
-        <div className="pos-buscador-productos">
-          <InputGroup>
+        <div className="pos-buscador-productos d-flex gap-2 align-items-start">
+          <InputGroup className="flex-grow-1">
             <InputGroup.Text><i className="bi bi-search"></i></InputGroup.Text>
             <Form.Control
               ref={refBuscador}
@@ -682,6 +724,18 @@ const Caja = () => {
               </Button>
             )}
           </InputGroup>
+
+          {categorias.length > 0 && (
+            <Form.Select size="sm" style={{ width: 'auto', minWidth: 140, flex: '0 0 auto' }}
+              aria-label="Filtrar por categoría" value={categoriaFiltro}
+              onChange={(e) => setCategoriaFiltro(e.target.value)}>
+              <option value="">Todas</option>
+              {categorias.filter((c) => c.activo === 1).map((c) => (
+                <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
+            </Form.Select>
+          )}
+
           {abierto && resultadosBusqueda.length > 0 && (
             <div className="lista-autocompleta">
               {resultadosBusqueda.map((p, idx) => (

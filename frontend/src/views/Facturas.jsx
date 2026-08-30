@@ -24,7 +24,7 @@ const Facturas = () => {
   const [cliente, setCliente] = useState('');
   const [estado, setEstado] = useState('');
   // Formato elegido para descargar/imprimir los PDF de facturas.
-  const [formatoPdf, setFormatoPdf] = useState('carta');
+  const [formatoPdf, setFormatoPdf] = useState('media_carta');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
 
@@ -227,7 +227,7 @@ const Facturas = () => {
                   <tr>
                     <th>Cant</th><th>Producto</th>
                     <th className="text-end">Vlr. Unit</th>
-                    <th className="text-end">IVA %</th>
+                    <th className="text-end">Impuestos</th>
                     <th className="text-end">Desc.</th>
                     <th className="text-end">Total</th>
                   </tr>
@@ -238,7 +238,11 @@ const Facturas = () => {
                       <td>{d.cantidad}</td>
                       <td>{d.producto_nombre}</td>
                       <td className="text-end">{formatoMoneda(d.precio_unitario)}</td>
-                      <td className="text-end">{d.impuesto_porcentaje}%</td>
+                      <td className="text-end">
+                        {Array.isArray(d.impuestos) && d.impuestos.length > 0
+                          ? d.impuestos.map((t) => `${t.nombre} ${Number(t.porcentaje)}%`).join(' + ')
+                          : `${d.impuesto_porcentaje}%`}
+                      </td>
                       <td className="text-end">
                         {Number(d.descuento) > 0 ? `- ${formatoMoneda(d.descuento)}` : '—'}
                       </td>
