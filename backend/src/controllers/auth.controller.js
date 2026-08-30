@@ -11,7 +11,7 @@ dotenv.config();
 // Parámetros de seguridad del login (anti fuerza bruta). Se pueden sobrescribir
 // con variables de entorno; por defecto 5 intentos y 15 minutos de bloqueo.
 const MAX_INTENTOS = Number(process.env.LOGIN_MAX_INTENTOS || 5);
-const MINUTOS_BLOQUEO = Number(process.env.LOGIN_BLOQUEO_MINUTOS || 15);
+const MINUTOS_BLOQUEO = Number(process.env.LOGIN_BLOQUEO_MINUTOS || 5);
 
 // Retorna la ventana de bloqueo aún por cumplir (minutos), o 0 si ya terminó.
 const minutosRestantesBloqueo = (bloqueadoHasta) => {
