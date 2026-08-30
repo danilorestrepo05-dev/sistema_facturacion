@@ -9,6 +9,8 @@ CREATE DATABASE IF NOT EXISTS sistema_facturacion
 USE sistema_facturacion;
 
 -- Tabla de usuarios del sistema (genérica, no amarrada a un negocio específico).
+-- Incluye el control de intentos de login (seguridad anti fuerza bruta); para
+-- bases ya existentes usa la migración 14_login_intentos.sql en vez de esto.
 CREATE TABLE IF NOT EXISTS usuarios (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   nombre_usuario VARCHAR(50) NOT NULL,
@@ -16,6 +18,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
   password_hash VARCHAR(255) NOT NULL,
   rol ENUM('admin', 'cajero') NOT NULL DEFAULT 'cajero',
   activo TINYINT(1) NOT NULL DEFAULT 1,
+  intentos_fallidos INT UNSIGNED NOT NULL DEFAULT 0,
+  bloqueado_hasta DATETIME NULL DEFAULT NULL,
   creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
