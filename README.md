@@ -1,6 +1,6 @@
 # Sistema de Facturación e Inventario
 
-> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.44. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
+> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.46. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
 
 Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Monorepo Full-Stack JS). Diseñado de forma genérica para que pueda adaptarse a cualquier modelo de negocio (tienda, peluquería, droguería, restaurante, etc.) cambiando únicamente registros de la base de datos y variables de entorno.
 
@@ -9,8 +9,11 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 - **Backend:** Node.js + Express 5 (`backend/`).
 - **Frontend:** React + Vite + Bootstrap 5 (`frontend/`, en desarrollo).
 
-## Estado actual (v0.9.27)
-- Base de datos `sistema_facturacion` con tablas `usuarios`, `impuestos`, `categorias`, `productos`, `clientes`, `proveedores`, `facturas`, `detalles_factura`, `movimientos_inventario` y `configuraciones`.
+## Estado actual (v0.9.46)
+- Base de datos `sistema_facturacion` con tablas `usuarios`, `impuestos`, `categorias`, `productos`, `clientes`, `proveedores`, `facturas`, `detalles_factura`, `detalle_impuestos`, `movimientos_inventario` y `configuraciones`.
+- **Impuestos por línea (multi-impuesto v0.9.44+)**: cada ítem de la venta puede llevar uno o varios impuestos del catálogo combinados sobre la misma base gravable (estilo Odoo/DIAN). El desglose se guarda en `detalle_impuestos` y se muestra en Caja, en el detalle de Facturas, en el ticket POS y en el PDF. Un producto nuevo hereda el impuesto configurado del catálogo por defecto.
+- **Exclusividad de Exento (v0.9.46)**: "Exento" (porcentaje 0) es mutuamente excluyente con los impuestos gravados (IVA, Retefuente, etc.). En la Caja marcar uno desmarca automáticamente los otros y los checkboxes incompatibles se deshabilitan; el backend rechaza con 400 cualquier mezcla exento + gravado. Elegir **Sin impuestos (exento)** aplica de inmediato y se refleja correctamente en ticket y PDF.
+- **PDF y ticket con impuestos legibles (v0.9.46)**: columnas redistribuidas (producto 238 / Vlr.Unit 65 / Imp 120 / Total 95pt) para que varios impuestos quepan sin superponerse ni entre columnas ni entre filas; el alto de cada fila considera el texto de impuestos que hace salto de línea. **Media carta** es el formato por defecto en Caja y Facturas.
 - **Descuentos**: por línea (monto $ con tope al valor de la línea; impuesto calculado sobre la base reducida) y descuento adicional de factura; desglose visible en el detalle de Facturas, ticket POS y PDF. El descuento total no puede dejar la venta en $0 ni en negativo (400 del backend + aviso en Caja).
 - **Módulo de configuraciones**: flags por instalación (códigos de barras, gaveta de dinero, arqueo de caja, visador) que activan o desactivan funciones opcionales en toda la interfaz; pantalla de administración exclusiva del admin (`/configuracion`).
 - **Carrito persistente en Caja**: la venta en curso sobrevive la navegación entre módulos y un refresco de página (sessionStorage); se vacía al cerrar sesión o al emitir la factura.
@@ -21,9 +24,10 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 - Catálogo (categorías, impuestos, productos) y contactos (clientes, proveedores) con CRUD protegido por roles.
 - Facturación transaccional: emisión con descuento de stock y movimientos de inventario, consulta y anulación.
 - **Compras / ingreso de mercancía (solo admin)**: registro de entradas de stock con costo unitario obligatorio, proveedor opcional (cabecera `compras`) y escáner de código de barras (pistola o cámara, precarga el último costo conocido); suma inventario, actualiza el precio de compra del producto y genera movimientos con motivo `compra` visibles en Reportes → Movimientos. El precio de compra es opcional al crear un producto: se aprende con la primera compra.
-- Impresión: PDF Carta/Media carta y ticket POS térmico (58/80mm).
+- Impresión: PDF **Carta** / **Media carta** (media carta por defecto) y ticket POS térmico (58/80mm). El PDF redistribuye sus columnas para acomodar varios impuestos sin superposición.
 - Reportes de ventas, inventario y movimientos de inventario.
 - **Frontend funcional**: Login, Dashboard con KPIs y gráficos, Caja (POS), Facturas, Productos, Catálogo, Clientes, Proveedores, Reportes y Usuarios.
+- **Caja estilo Odoo Ventas (v0.9.43–44)**: autocompletado de productos con dropdown, tabla de venta full-width con sticky header y columna de impuestos por línea, filtro de categorías junto al buscador, y barra inferior fija con cliente, forma de pago, descuento, totales y botón "Cobrar y emitir". En móvil, botón flotante que abre el carrito por offcanvas. El selector de impuestos aplica los cambios al instante y cierra al hacer clic fuera.
 - Módulos pendientes: facturación electrónica DIAN (a futuro).
 
 ## Cómo ejecutar el backend
