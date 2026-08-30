@@ -7,5 +7,19 @@
 
 USE sistema_facturacion;
 
-ALTER TABLE detalles_factura
-  ADD COLUMN descuento DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER precio_unitario;
+-- Aplica el ALTER solo si la columna no existe (idempotente y seguro de re-ejecutar).
+SET @existe := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'detalles_factura'
+    AND COLUMN_NAME = 'descuento'
+);
+
+SET @sql := IF(@existe = 0,
+  'ALTER TABLE detalles_factura ADD COLUMN descuento DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER precio_unitario',
+  'SELECT 1'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

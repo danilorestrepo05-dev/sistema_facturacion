@@ -1,9 +1,10 @@
--- 08_configuraciones.sql
+-- 02_configuraciones.sql
 -- Crea la tabla de configuraciones del sistema: flags de funciones opcionales
 -- (códigos de barras, gaveta, arqueo, visador) que cada instalación activa o no.
+-- No depende de otras tablas, por lo que corre en segundo lugar (hueco 02).
 -- IMPORTANTE: ejecutar con charset utf8mb4 y redirección de cmd (no tubería de
 -- PowerShell, que re-encoda en ASCII y corrompe tildes con '??'):
---   cmd /c "C:\xampp\mysql\bin\mysql.exe -u root --default-character-set=utf8mb4 < backend\sql\08_configuraciones.sql"
+--   cmd /c "C:\xampp\mysql\bin\mysql.exe -u root --default-character-set=utf8mb4 < backend\sql\02_configuraciones.sql"
 
 USE sistema_facturacion;
 

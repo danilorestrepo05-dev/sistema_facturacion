@@ -5,5 +5,19 @@
 
 USE sistema_facturacion;
 
-ALTER TABLE proveedores
-  ADD COLUMN tipo_item VARCHAR(150) NULL AFTER direccion;
+-- Aplica el ALTER solo si la columna no existe (idempotente y seguro de re-ejecutar).
+SET @existe := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'proveedores'
+    AND COLUMN_NAME = 'tipo_item'
+);
+
+SET @sql := IF(@existe = 0,
+  'ALTER TABLE proveedores ADD COLUMN tipo_item VARCHAR(150) NULL AFTER direccion',
+  'SELECT 1'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

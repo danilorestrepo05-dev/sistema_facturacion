@@ -5,8 +5,12 @@
 
 USE sistema_facturacion;
 
-INSERT INTO impuestos (nombre, porcentaje, activo) VALUES
-  ('Exento', 0.00, 1),
-  ('IVA 5%', 5.00, 1),
-  ('IVA 19%', 19.00, 1)
-ON DUPLICATE KEY UPDATE nombre = VALUES(nombre);
+-- Insertar solo los impuestos de referencia que aún no existen por nombre.
+-- (Sin clave única en `nombre`, ON DUPLICATE KEY no evita duplicados; por eso
+-- se comprueba con NOT EXISTS para que re-ejecutar el script no duplique.)
+INSERT INTO impuestos (nombre, porcentaje, activo)
+SELECT 'Exento',   0.00, 1 WHERE NOT EXISTS (SELECT 1 FROM impuestos WHERE nombre = 'Exento');
+INSERT INTO impuestos (nombre, porcentaje, activo)
+SELECT 'IVA 5%',   5.00, 1 WHERE NOT EXISTS (SELECT 1 FROM impuestos WHERE nombre = 'IVA 5%');
+INSERT INTO impuestos (nombre, porcentaje, activo)
+SELECT 'IVA 19%', 19.00, 1 WHERE NOT EXISTS (SELECT 1 FROM impuestos WHERE nombre = 'IVA 19%');

@@ -6,6 +6,22 @@
 
 USE sistema_facturacion;
 
-ALTER TABLE productos
-  ADD COLUMN codigo_barras VARCHAR(50) NULL AFTER codigo,
-  ADD UNIQUE KEY uq_productos_codigo_barras (codigo_barras);
+-- Aplica el ALTER solo si la columna no existe (idempotente y seguro de re-ejecutar).
+SET @existe := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'productos'
+    AND COLUMN_NAME = 'codigo_barras'
+);
+
+-- El ALTER agrega la columna y la key única en un solo paso (solo si falta la columna).
+SET @sql := IF(@existe = 0,
+  'ALTER TABLE productos
+     ADD COLUMN codigo_barras VARCHAR(50) NULL AFTER codigo,
+     ADD UNIQUE KEY uq_productos_codigo_barras (codigo_barras)',
+  'SELECT 1'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

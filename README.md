@@ -1,6 +1,6 @@
 # Sistema de Facturación e Inventario
 
-> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.48. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
+> **⚠️ Proyecto en construcción** — Versión de desarrollo v0.9.49. Este repositorio contiene el código fuente en evolución activa; las funcionalidades y la documentación pueden cambiar. Úsalo bajo tu propio criterio.
 
 Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Monorepo Full-Stack JS). Diseñado de forma genérica para que pueda adaptarse a cualquier modelo de negocio (tienda, peluquería, droguería, restaurante, etc.) cambiando únicamente registros de la base de datos y variables de entorno.
 
@@ -9,7 +9,7 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 - **Backend:** Node.js + Express 5 (`backend/`).
 - **Frontend:** React + Vite + Bootstrap 5 (`frontend/`, en desarrollo).
 
-## Estado actual (v0.9.47)
+## Estado actual (v0.9.49)
 - Base de datos `sistema_facturacion` con tablas `usuarios`, `impuestos`, `categorias`, `productos`, `clientes`, `proveedores`, `facturas`, `detalles_factura`, `detalle_impuestos`, `movimientos_inventario` y `configuraciones`.
 - **Impuestos por línea (multi-impuesto v0.9.44+)**: cada ítem de la venta puede llevar uno o varios impuestos del catálogo combinados sobre la misma base gravable. El desglose se guarda en `detalle_impuestos` y se muestra en Caja, en el detalle de Facturas, en el ticket POS y en el PDF. Un producto nuevo hereda el impuesto configurado del catálogo por defecto.
 - **Exclusividad de Exento (v0.9.46)**: "Exento" (porcentaje 0) es mutuamente excluyente con los impuestos gravados (IVA, Retefuente, etc.). En la Caja marcar uno desmarca automáticamente los otros y los checkboxes incompatibles se deshabilitan; el backend rechaza con 400 cualquier mezcla exento + gravado. Elegir **Sin impuestos (exento)** aplica de inmediato y se refleja correctamente en ticket y PDF.
@@ -37,8 +37,15 @@ Sistema POS y administrativo desacoplado, escalable y modular (arquitectura Mono
 1. Encender MariaDB (XAMPP) y ejecutar el esquema. Usa redirección de `cmd` con
    charset utf8mb4: la tubería de PowerShell re-encoda en ASCII y corrompe las tildes:
    ```powershell
-   cmd /c "C:\xampp\mysql\bin\mysql.exe -u root --default-character-set=utf8mb4 < backend\sql\01_schema.sql"
+   cmd /c "C:\xampp\mysql\bin\mysql.exe -u root --default-character-set=utf8mb4 < backend\sql\00_instalacion.sql"
    ```
+   > **Instalación de BD desde cero (servidor nuevo / clonado a otro negocio):**
+   > el script maestro `backend/sql/00_instalacion.sql` aplica los 14 scripts
+   > (`01_schema` … `14_login_intentos`) en el orden correcto para que las claves
+   > foráneas (FK) referencien tablas ya creadas y **no generen errores**. Envuelve
+   > la carga con `SET FOREIGN_KEY_CHECKS=0/1` como red de seguridad y es
+   > re-ejecutable (idempotente). Los scripts `01..14` individuales se conservan
+   > para migrar bases ya existentes.
 2. Instalar dependencias (pnpm v11, activado vía corepack):
    ```powershell
    cd backend; pnpm install
