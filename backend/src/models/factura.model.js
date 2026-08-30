@@ -220,6 +220,16 @@ const crear = async (datos, usuarioId) => {
             );
           }
           impuestosLinea = filas.map((f) => ({ ...f }));
+          if (impuestosLinea.length > 1) {
+            const tieneExento = impuestosLinea.some((t) => Number(t.porcentaje) === 0);
+            const tieneGravado = impuestosLinea.some((t) => Number(t.porcentaje) > 0);
+            if (tieneExento && tieneGravado) {
+              throw Object.assign(
+                new Error('Exento no puede combinarse con impuestos gravados'),
+                { status: 400 }
+              );
+            }
+          }
         } else {
           impuestosLinea = [];
         }

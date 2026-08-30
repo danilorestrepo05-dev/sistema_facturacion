@@ -76,10 +76,10 @@ const generarFacturaPDF = (factura, { formato = 'carta' } = {}) =>
     y += altoLinea;
 
     // --- Tabla de detalle ---
-    const colCant = 32;
-    const colVlr = 82;
-    const colImp = 40;
-    const colTotal = 90;
+    const colCant = 30;
+    const colVlr = 65;
+    const colImp = 120;
+    const colTotal = 95;
     const colProd = ancho - colCant - colVlr - colImp - colTotal;
 
     const xCant = margen;
@@ -106,11 +106,12 @@ const generarFacturaPDF = (factura, { formato = 'carta' } = {}) =>
       const totalLinea = formatearMoneda(detalle.subtotal);
       const vlrUnit = formatearMoneda(detalle.precio_unitario);
       const impPorc = Array.isArray(detalle.impuestos) && detalle.impuestos.length > 0
-        ? detalle.impuestos.map((t) => `${Number(t.porcentaje)}%`).join('+')
+        ? detalle.impuestos.map((t) => `${t.nombre} ${Number(t.porcentaje)}%`).join(' + ')
         : `${detalle.impuesto_porcentaje}%`;
 
-      const envuelto = doc.heightOfString(detalle.producto_nombre, { width: colProd });
-      const altoFila = Math.max(altoLinea, envuelto + (esMedia ? 2 : 4));
+      const envueltoProd = doc.heightOfString(detalle.producto_nombre, { width: colProd });
+      const envueltoImp = doc.heightOfString(impPorc, { width: colImp });
+      const altoFila = Math.max(altoLinea, envueltoProd + (esMedia ? 2 : 4), envueltoImp + (esMedia ? 2 : 4));
 
       doc.text(cantidad, xCant, y, { width: colCant });
       doc.text(detalle.producto_nombre, xProd, y, { width: colProd });

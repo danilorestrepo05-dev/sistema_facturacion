@@ -355,9 +355,11 @@ async function main() {
   // --- Impuestos combinados por línea (multi-impuesto v0.9.44) ---
   const listaImpuestos = await peticion('GET', '/impuestos', tokenAdmin);
   const impuestosActivos = (listaImpuestos.datos.datos || []).filter((i) => i.activo === 1);
-  if (impuestosActivos.length >= 2) {
-    const impA = impuestosActivos[0];
-    const impB = impuestosActivos[1];
+  // Exento (porcentaje 0) es mutuamente exclusivo: solo se combinan gravados (> 0).
+  const gravados = impuestosActivos.filter((i) => Number(i.porcentaje) > 0);
+  if (gravados.length >= 2) {
+    const impA = gravados[0];
+    const impB = gravados[1];
     // idProducto1 cuesta 4000; 1 unidad = base 4000.
     // Impuesto combinado = base * (%A + %B) / 100.
     const esperadoImp = 4000 * (Number(impA.porcentaje) + Number(impB.porcentaje)) / 100;
@@ -372,7 +374,7 @@ async function main() {
     const detMulti = await peticion('GET', `/facturas/${fm.id}`, tokenAdmin);
     ok('Desglose de impuestos guardado en detalle',
       detMulti.datos.datos.detalles[0]?.impuestos?.length === 2);
-  } else if (impuestosActivos.length === 1) {
+  } else if (impuestosActivos.length >= 1) {
     const impUnico = impuestosActivos[0];
     const esperadoImp = 4000 * Number(impUnico.porcentaje) / 100;
     const facturaDefault = await peticion('POST', '/facturas', tokenCajero, {
@@ -388,8 +390,19 @@ async function main() {
   const impInvalido = await peticion('POST', '/facturas', tokenCajero, {
     items: [{ producto_id: idProducto1, cantidad: 1, impuestos: [99999] }]
   });
-  ok('Impuesto inexistente rechazado (400)', impInvalido.status === 400,
-    impInvalido.datos?.mensaje || '');
+    ok('Impuesto inexistente rechazado (400)', impInvalido.status === 400,
+      impInvalido.datos?.mensaje || '');
+
+    // Validar que Exento + gravado es rechazado (400)
+    const exento = impuestosActivos.find((i) => Number(i.porcentaje) === 0);
+    const gravUno = gravados[0];
+    if (exento && gravUno) {
+      const mezclaInvalida = await peticion('POST', '/facturas', tokenCajero, {
+        items: [{ producto_id: idProducto1, cantidad: 1, impuestos: [exento.id, gravUno.id] }]
+      });
+      ok('Mezcla Exento + gravado rechazada (400)', mezclaInvalida.status === 400,
+        mezclaInvalida.datos?.mensaje || '');
+    }
 
   console.log('\n=== 6. Impresión: PDF y ticket POS ===');
 
