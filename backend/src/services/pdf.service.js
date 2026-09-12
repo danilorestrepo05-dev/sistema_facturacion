@@ -2,6 +2,7 @@
 // Genera el PDF de una factura en formato Carta o Media Carta usando PDFKit.
 const PDFDocument = require('pdfkit');
 const empresa = require('../utils/empresa');
+const qrService = require('./dian/qr');
 
 // Dimensiones de página en puntos (1 punto = 1/72 pulgada).
 const FORMATOS = {
@@ -21,9 +22,9 @@ const formatearFecha = (fechaSql) => {
 
 // Genera el buffer del PDF de una factura.
 // factura debe incluir: numero_factura, prefijo, cliente_nombre, usuario_nombre,
-// tipo_pago, subtotal, impuesto_total, descuento, total, creado_en y detalles[].
+// tipo_pago, subtotal, impuesto_total, descuento, total, creado_en, cufe y detalles[].
 const generarFacturaPDF = (factura, { formato = 'carta' } = {}) =>
-  new Promise((resolve, reject) => {
+  new Promise(async (resolve, reject) => {
     const size = FORMATOS[formato] || FORMATOS.carta;
     const esMedia = formato === 'media_carta';
 
@@ -33,6 +34,18 @@ const generarFacturaPDF = (factura, { formato = 'carta' } = {}) =>
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
+
+    // Genera el QR de la factura electrónica si la factura tiene CUFE.
+    let bufferQr = null;
+    if (factura.cufe) {
+      try {
+        const contenido = qrService.contenidoQr({ factura, empresa, cufe: factura.cufe });
+        bufferQr = await qrService.generarImagenQr(contenido, { width: 140 });
+      } catch (err) {
+        console.error('[PDF] No se pudo generar el QR:', err.message);
+        bufferQr = null;
+      }
+    }
 
     const tTitulo = esMedia ? 12 : 16;
     const tNormal = esMedia ? 8 : 10;
@@ -164,11 +177,211 @@ const generarFacturaPDF = (factura, { formato = 'carta' } = {}) =>
     doc.text(formatearMoneda(factura.total), margen, y, { align: 'right', width: ancho });
     y += esMedia ? 14 : 24;
 
-    // --- Pie de página ---
+    // --- Pie de página: QR + CUFE de la facturación electrónica ---
+    // Solo se dibuja si hay espacio vertical suficiente para el QR y su texto,
+    // de modo que una factura con muchas líneas (sobre todo media carta, muy
+    // corta) no desborde el contenido fuera de la página.
+    const altoDisponible = size[1] - margen - y;
+    if (factura.cufe && bufferQr && altoDisponible >= (esMedia ? 80 : 96)) {
+      const ladoQr = esMedia ? 60 : 70;
+      const xQr = size[0] - margen - ladoQr;
+      // Sitúa el QR a la derecha y el texto del CUFE a su izquierda.
+      doc.image(bufferQr, xQr, y, { width: ladoQr, height: ladoQr });
+
+      doc.font('Helvetica').fontSize(tPequena).fillColor('#777777');
+      const textoPie = [
+        `FACTURA ELECTRÓNICA`,
+        `CUFE: ${factura.cufe}`,
+        'Válida en: catalogo-vpfe.dian.gov.co'
+      ];
+      textoPie.forEach((linea) => {
+        doc.text(linea, margen, y, {
+          width: xQr - margen - 6,
+          lineBreak: true,
+          ellipsis: false
+        });
+        y += esMedia ? 7 : 9;
+      });
+
+      y += ladoQr;
+    }
+
     doc.font('Helvetica').fontSize(tPequena).fillColor('#777777')
       .text('¡Gracias por su compra!', margen, y, { align: 'center', width: ancho });
 
     doc.end();
   });
 
-module.exports = { generarFacturaPDF };
+// Genera el buffer del PDF de una NOTA correctiva (crédito o débito) usando el
+// mismo estilo de la factura. La nota referencia siempre una factura original.
+const generarNotaPDF = (nota, { formato = 'carta' } = {}) =>
+  new Promise(async (resolve, reject) => {
+    const size = FORMATOS[formato] || FORMATOS.carta;
+    const esMedia = formato === 'media_carta';
+
+    const doc = new PDFDocument({ size, margin: 32 });
+
+    const chunks = [];
+    doc.on('data', (c) => chunks.push(c));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    const esCredito = nota.tipo === 'credito';
+    const titulo = esCredito ? 'NOTA CRÉDITO' : 'NOTA DÉBITO';
+
+    // Genera el QR si la nota ya fue emitida electrónicamente (tiene CUDE).
+    let bufferQr = null;
+    if (nota.cufe) {
+      try {
+        const contenido = qrService.contenidoQr({ factura: nota, empresa, cufe: nota.cufe });
+        bufferQr = await qrService.generarImagenQr(contenido, { width: 140 });
+      } catch (err) {
+        console.error('[PDF] No se pudo generar el QR de la nota:', err.message);
+        bufferQr = null;
+      }
+    }
+
+    const tTitulo = esMedia ? 12 : 16;
+    const tNormal = esMedia ? 8 : 10;
+    const tPequena = esMedia ? 7 : 8.5;
+    const altoLinea = esMedia ? 10 : 14;
+    const margen = 32;
+    const ancho = size[0] - (margen * 2);
+
+    // --- Encabezado con los datos de la empresa ---
+    let y = margen;
+    doc.font('Helvetica-Bold').fontSize(tTitulo).fillColor('#222222')
+      .text(empresa.nombre, margen, y, { align: 'center', width: ancho });
+    y += esMedia ? 14 : 24;
+
+    doc.font('Helvetica').fontSize(tNormal).fillColor('#444444');
+    [empresa.documento, empresa.direccion, `${empresa.ciudad} - Tel: ${empresa.telefono}`, empresa.email]
+      .filter(Boolean)
+      .forEach((linea) => {
+        doc.text(linea, margen, y, { align: 'center', width: ancho });
+        y += esMedia ? 9 : 13;
+      });
+
+    // --- Identificación de la nota ---
+    y += esMedia ? 6 : 12;
+    doc.moveTo(margen, y).lineTo(size[0] - margen, y).strokeColor('#cccccc').stroke();
+    y += esMedia ? 8 : 12;
+
+    doc.font('Helvetica-Bold').fillColor('#222222').fontSize(tNormal)
+      .text(`${titulo} No. ${nota.prefijo || ''}${nota.numero_nota}`, margen, y);
+    doc.font('Helvetica').fillColor('#555555')
+      .text(`Fecha: ${formatearFecha(nota.creado_en)}`, margen, y, { align: 'right', width: ancho });
+    y += altoLinea;
+
+    doc.text(`Cliente: ${nota.cliente_nombre || 'Consumidor Final'}`, margen, y);
+    doc.text(`Usuario: ${nota.usuario_nombre || ''}`, margen, y, { align: 'right', width: ancho });
+    y += altoLinea;
+
+    // Referencia a la factura original y motivo.
+    const numOriginal = nota.factura_prefijo
+      ? `${nota.factura_prefijo}-${nota.factura_numero}`
+      : `${nota.factura_numero || ''}`;
+    doc.text(`Factura original: ${numOriginal || '—'}`, margen, y);
+    y += altoLinea;
+    doc.text(`Motivo: ${nota.motivo || (esCredito ? 'Nota crédito' : 'Nota débito')}`, margen, y);
+    y += altoLinea;
+
+    // --- Tabla de detalle ---
+    const colCant = 30;
+    const colVlr = 65;
+    const colImp = 120;
+    const colTotal = 95;
+    const colProd = ancho - colCant - colVlr - colImp - colTotal;
+
+    const xCant = margen;
+    const xProd = xCant + colCant;
+    const xVlr = xProd + colProd;
+    const xImp = xVlr + colVlr;
+    const xTotal = xImp + colImp;
+
+    doc.font('Helvetica-Bold').fontSize(tNormal).fillColor('#222222');
+    doc.text('Cant', xCant, y, { width: colCant });
+    doc.text('Producto', xProd, y, { width: colProd });
+    doc.text('Vlr.Unit', xVlr, y, { width: colVlr, align: 'right' });
+    doc.text('Imp', xImp, y, { width: colImp, align: 'right' });
+    doc.text('Total', xTotal, y, { width: colTotal, align: 'right' });
+    y += altoLinea;
+
+    doc.moveTo(margen, y).lineTo(size[0] - margen, y).strokeColor('#cccccc').stroke();
+    y += esMedia ? 4 : 6;
+
+    doc.font('Helvetica').fontSize(tNormal).fillColor('#333333');
+    (nota.detalles || []).forEach((detalle) => {
+      const totalLinea = formatearMoneda(detalle.subtotal);
+      const vlrUnit = formatearMoneda(detalle.precio_unitario);
+      const impPorc = `${detalle.impuesto_porcentaje}%`;
+
+      const envueltoProd = doc.heightOfString(detalle.producto_nombre, { width: colProd });
+      const altoFila = Math.max(altoLinea, envueltoProd + (esMedia ? 2 : 4));
+
+      doc.text(String(detalle.cantidad), xCant, y, { width: colCant });
+      doc.text(detalle.producto_nombre, xProd, y, { width: colProd });
+      doc.text(vlrUnit, xVlr, y, { width: colVlr, align: 'right' });
+      doc.text(impPorc, xImp, y, { width: colImp, align: 'right' });
+      doc.text(totalLinea, xTotal, y, { width: colTotal, align: 'right' });
+
+      y += altoFila;
+
+      if (Number(detalle.descuento) > 0) {
+        doc.font('Helvetica').fontSize(tPequena).fillColor('#777777')
+          .text(`Descuento: - ${formatearMoneda(detalle.descuento)}`, xTotal, y, { width: colTotal, align: 'right' });
+        doc.font('Helvetica').fontSize(tNormal).fillColor('#333333');
+        y += esMedia ? 12 : 16;
+      }
+    });
+
+    // --- Totales ---
+    y += esMedia ? 4 : 6;
+    const escribirTotal = (etiqueta, valor) => {
+      doc.font('Helvetica').fontSize(tNormal).fillColor('#333333')
+        .text(etiqueta, margen, y);
+      doc.text(valor, margen, y, { align: 'right', width: ancho });
+      y += altoLinea;
+    };
+
+    escribirTotal('Subtotal', formatearMoneda(nota.subtotal));
+    escribirTotal('Impuestos', formatearMoneda(nota.impuesto_total));
+    if (Number(nota.descuento) > 0) {
+      escribirTotal('Descuento', `- ${formatearMoneda(nota.descuento)}`);
+    }
+
+    doc.moveTo(margen, y).lineTo(size[0] - margen, y).strokeColor('#888888').stroke();
+    y += esMedia ? 6 : 10;
+
+    doc.font('Helvetica-Bold').fontSize(esMedia ? 11 : 14).fillColor('#222222')
+      .text('TOTAL', margen, y);
+    doc.text(formatearMoneda(nota.total), margen, y, { align: 'right', width: ancho });
+    y += esMedia ? 14 : 24;
+
+    // --- Pie: QR + CUDE de la facturación electrónica ---
+    const altoDisponible = size[1] - margen - y;
+    if (nota.cufe && bufferQr && altoDisponible >= (esMedia ? 80 : 96)) {
+      const ladoQr = esMedia ? 60 : 70;
+      const xQr = size[0] - margen - ladoQr;
+      doc.image(bufferQr, xQr, y, { width: ladoQr, height: ladoQr });
+
+      doc.font('Helvetica').fontSize(tPequena).fillColor('#777777');
+      const textoPie = [
+        `${titulo} ELECTRÓNICA`,
+        `CUDE: ${nota.cufe}`,
+        'Válida en: catalogo-vpfe.dian.gov.co'
+      ];
+      textoPie.forEach((linea) => {
+        doc.text(linea, margen, y, { width: xQr - margen - 6, lineBreak: true });
+        y += esMedia ? 7 : 9;
+      });
+      y += ladoQr;
+    }
+
+    doc.font('Helvetica').fontSize(tPequena).fillColor('#777777')
+      .text('¡Gracias por su compra!', margen, y, { align: 'center', width: ancho });
+
+    doc.end();
+  });
+
+module.exports = { generarFacturaPDF, generarNotaPDF };

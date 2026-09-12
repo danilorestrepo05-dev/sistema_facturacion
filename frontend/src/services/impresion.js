@@ -122,3 +122,94 @@ const verificarErrorBlob = async (blob) => {
     throw error;
   }
 };
+
+// Abre el PDF de una nota correctiva en una pestaña nueva.
+export const abrirPdfNota = async (id, formato = 'carta') => {
+  const ventana = window.open('', '_blank');
+  if (!ventana) return;
+  try {
+    const respuesta = await api.get(`/notas/${id}/pdf`, {
+      params: { formato },
+      responseType: 'blob'
+    });
+    await verificarErrorBlob(respuesta.data);
+    const url = window.URL.createObjectURL(new Blob([respuesta.data], { type: 'application/pdf' }));
+    ventana.location.href = url;
+    setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+  } catch (err) {
+    ventana.close();
+    throw err;
+  }
+};
+
+// Abre el ticket de una nota correctiva en una ventana lista para imprimir.
+export const abrirTicketNota = async (id, ancho = 80) => {
+  const ventana = window.open('', '_blank');
+  if (!ventana) return;
+  try {
+    const respuesta = await api.get(`/notas/${id}/ticket`, {
+      params: { ancho },
+      responseType: 'blob'
+    });
+    const esError = respuesta.data.type.includes('json');
+    const texto = esError
+      ? `Error al generar el ticket:\n${await respuesta.data.text()}`
+      : await respuesta.data.text();
+
+    const doc = ventana.document;
+    doc.open();
+    doc.write('<!DOCTYPE html><html><head><meta charset="utf-8">');
+    doc.write('<title>Ticket nota</title>');
+
+    if (!esError) {
+      const mm = ancho === '58' ? 58 : 80;
+      const anchoContenido = ancho === '58' ? 48 : 72;
+      doc.write(`<style>
+        @page { size: ${mm}mm auto; margin: 0; }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; background: #fff; }
+        body { width: ${anchoContenido}mm; margin: 0 auto; padding: 4mm 0;
+               font-family: 'Courier New', Courier, monospace;
+               font-size: 12px; }
+        .ticket { white-space: pre; margin: 0; }
+        .barra { text-align: center; margin: 0 0 4mm; }
+        .barra button { font-family: inherit; font-size: 14px; padding: 6px 14px;
+                        cursor: pointer; }
+        @media print {
+          .barra { display: none; }
+          body { padding: 0; font-size: 9px; }
+        }
+      </style>`);
+    }
+
+    doc.write('</head><body>');
+    doc.write('<div class="barra"><button type="button" id="btnImprimir">Imprimir (Ctrl+P)</button></div>');
+    doc.write('<pre class="ticket" id="contenidoTicket"></pre>');
+    doc.write('</body></html>');
+    doc.close();
+
+    const pre = doc.getElementById('contenidoTicket');
+    if (esError) {
+      pre.textContent = texto;
+    } else {
+      pre.textContent = texto
+        .replace(/\x1b@/g, '')
+        .replace(/\x1b/g, '')
+        .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+    }
+
+    const btn = doc.getElementById('btnImprimir');
+    if (btn) btn.addEventListener('click', () => ventana.print());
+
+    ventana.focus();
+
+    if (!esError) {
+      setTimeout(() => ventana.print(), 300);
+    }
+  } catch (err) {
+    ventana.close();
+    throw err;
+  }
+};
