@@ -2,8 +2,9 @@
 // Pantalla de inicio de sesión.
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router';
-import { Button, Card, Form, Alert } from 'react-bootstrap';
+import { Button, Card, Form } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
+import AlertaAuto from '../components/AlertaAuto';
 
 const Login = () => {
   const { usuario, iniciarSesion } = useAuth();
@@ -43,7 +44,7 @@ const Login = () => {
             <p className="text-secondary mb-0">Inicia sesión para continuar</p>
           </div>
 
-          {error && <Alert variant="danger">{error}</Alert>}
+          <AlertaAuto variante="danger" mensaje={error} onCerrar={() => setError('')} />
 
           <Form onSubmit={enviar}>
             <Form.Group className="mb-3">

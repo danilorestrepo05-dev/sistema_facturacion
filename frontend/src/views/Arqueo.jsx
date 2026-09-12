@@ -8,6 +8,7 @@ import {
 import api from '../services/api';
 import { useConfig } from '../context/ConfigContext';
 import { formatoMoneda } from '../utils/format';
+import AlertaAuto from '../components/AlertaAuto';
 
 const Arqueo = () => {
   const { estaHabilitado } = useConfig();
@@ -112,7 +113,7 @@ const Arqueo = () => {
   return (
     <div>
       <h4 className="mb-3">Arqueo de caja</h4>
-      {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+      <AlertaAuto variante="danger" mensaje={error} onCerrar={() => setError('')} />
 
       {/* Resultado del último cierre */}
       {aviso && (

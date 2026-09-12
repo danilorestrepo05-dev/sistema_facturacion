@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import api from '../services/api';
 import { formatoMoneda, formatoFechaHora, fechaHoyLocal } from '../utils/format';
+import AlertaAuto from '../components/AlertaAuto';
 import Paginacion from '../components/Paginacion';
 
 const COLORS = ['#5d3fd3', '#0dcaf0', '#198754', '#fd7e14', '#dc3545', '#6f42c1'];
@@ -130,7 +131,7 @@ const Reportes = () => {
         </Button>
       </div>
 
-      {error && <Alert variant="danger" className="no-print" dismissible onClose={() => setError('')}>{error}</Alert>}
+      <AlertaAuto variante="danger" mensaje={error} onCerrar={() => setError('')} />
 
       <div className="contenido-pantalla">
       <Tab.Container activeKey={tabActiva} onSelect={(k) => setTabActiva(k)}>

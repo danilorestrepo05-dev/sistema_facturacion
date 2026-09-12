@@ -11,6 +11,7 @@ import {
 import api from '../services/api';
 import { formatoMoneda } from '../utils/format';
 import { useConfig } from '../context/ConfigContext';
+import AlertaAuto from '../components/AlertaAuto';
 
 // Fila vacía del formulario de líneas.
 const filaVacia = () => ({ producto_id: '', cantidad: '', costo_unitario: '' });
@@ -249,7 +250,7 @@ const Compras = () => {
               <Link to="/productos">Productos</Link>.
             </p>
 
-            {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+            <AlertaAuto variante="danger" mensaje={error} onCerrar={() => setError('')} />
 
             {/* Escáner de código de barras (pistola USB o cámara) */}
             {escaneoActivo && (
@@ -277,23 +278,27 @@ const Compras = () => {
               </Form.Group>
             )}
 
-            {exito && (
-              <Alert variant="success" dismissible onClose={() => setExito(null)}>
-                <div className="fw-semibold">Compra #{exito.compra_id} registrada</div>
-                {exito.items.map((i) => (
-                  <div key={i.producto_id} className="small">
-                    +{i.cantidad} × {i.nombre} ({formatoMoneda(i.costo_unitario)} c/u)
+            <AlertaAuto
+              variante="success"
+              mensaje={exito && (
+                <>
+                  <div className="fw-semibold">Compra #{exito.compra_id} registrada</div>
+                  {exito.items.map((i) => (
+                    <div key={i.producto_id} className="small">
+                      +{i.cantidad} × {i.nombre} ({formatoMoneda(i.costo_unitario)} c/u)
+                    </div>
+                  ))}
+                  <div className="small mt-1">
+                    Unidades: <strong>{exito.unidades}</strong> · Costo total:{' '}
+                    <strong>{formatoMoneda(exito.costo_total)}</strong>
                   </div>
-                ))}
-                <div className="small mt-1">
-                  Unidades: <strong>{exito.unidades}</strong> · Costo total:{' '}
-                  <strong>{formatoMoneda(exito.costo_total)}</strong>
-                </div>
-                <div className="small mt-1 fst-italic">
-                  Si cambió el costo de algún producto, revisa su precio de venta en Productos.
-                </div>
-              </Alert>
-            )}
+                  <div className="small mt-1 fst-italic">
+                    Si cambió el costo de algún producto, revisa su precio de venta en Productos.
+                  </div>
+                </>
+              )}
+              onCerrar={() => setExito(null)}
+            />
 
             <Form onSubmit={enviar}>
               {/* Proveedor opcional de la compra */}

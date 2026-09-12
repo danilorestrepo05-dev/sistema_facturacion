@@ -2,10 +2,11 @@
 // Administración del catálogo: categorías e impuestos con CRUD en modal.
 import { useEffect, useState } from 'react';
 import {
-  Row, Col, Card, Form, Button, Table, Badge, Spinner, Alert, Modal, Nav, Tab
+  Row, Col, Card, Form, Button, Table, Badge, Spinner, Modal, Nav, Tab
 } from 'react-bootstrap';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import AlertaAuto from '../components/AlertaAuto';
 
 const Catalogo = () => (
   <div>
@@ -89,7 +90,7 @@ const PanelCategorias = () => {
 
   return (
     <>
-      {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+      <AlertaAuto variante="danger" mensaje={error} onCerrar={() => setError('')} />
       <div className="d-flex justify-content-end mb-3">
         {esAdmin && (
           <Button variant="primary" onClick={abrirNuevo}>
@@ -231,7 +232,7 @@ const PanelImpuestos = () => {
 
   return (
     <>
-      {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+      <AlertaAuto variante="danger" mensaje={error} onCerrar={() => setError('')} />
       <div className="d-flex justify-content-end mb-3">
         {esAdmin && (
           <Button variant="primary" onClick={abrirNuevo}>

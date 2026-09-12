@@ -2,11 +2,12 @@
 // Gestión de usuarios del sistema (solo administradores): listado y CRUD con modal.
 import { useEffect, useState } from 'react';
 import {
-  Row, Col, Card, Form, Button, Table, Badge, Spinner, Alert, Modal
+  Row, Col, Card, Form, Button, Table, Badge, Spinner, Modal
 } from 'react-bootstrap';
 import api from '../services/api';
 import { formatoFechaHora } from '../utils/format';
 import Paginacion from '../components/Paginacion';
+import AlertaAuto from '../components/AlertaAuto';
 
 const ROLES = ['admin', 'cajero'];
 const POR_PAGINA = 20;
@@ -107,7 +108,7 @@ const Usuarios = () => {
         </Button>
       </div>
 
-      {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+      <AlertaAuto variante="danger" mensaje={error} onCerrar={() => setError('')} />
 
       <Card className="card-kpi mb-3">
         <Card.Body>

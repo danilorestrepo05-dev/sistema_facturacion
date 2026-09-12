@@ -2,11 +2,12 @@
 // Gestión de proveedores: listado, búsqueda y CRUD con modal.
 import { useEffect, useState } from 'react';
 import {
-  Row, Col, Card, Form, Button, Table, Badge, Spinner, Alert, Modal
+  Row, Col, Card, Form, Button, Table, Badge, Spinner, Modal
 } from 'react-bootstrap';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Paginacion from '../components/Paginacion';
+import AlertaAuto from '../components/AlertaAuto';
 
 const TIPOS_DOCUMENTO = ['CC', 'NIT', 'CE', 'Pasaporte', 'Otro'];
 const POR_PAGINA = 20;
@@ -100,7 +101,7 @@ const Proveedores = () => {
         )}
       </div>
 
-      {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+      <AlertaAuto variante="danger" mensaje={error} onCerrar={() => setError('')} />
 
       <Card className="card-kpi mb-3">
         <Card.Body>
