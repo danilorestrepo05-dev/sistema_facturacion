@@ -11,25 +11,109 @@ body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Estructura principal con barra lateral fija */
+/* Estructura principal: navbar superior fija + contenido debajo */
 .app-layout {
   display: flex;
+  flex-direction: column;
   min-height: 100vh;
 }
 
-.app-sidebar {
-  width: 230px;
-  min-width: 230px;
-  background: var(--color-sidebar);
-  color: #cbd5e1;
-  display: flex;
-  flex-direction: column;
+/* Barra superior de dos filas: (1) marca + acciones, (2) menú por grupos.
+   Ambas filas quedan dentro del mismo header sticky. */
+.app-navbar {
   position: sticky;
   top: 0;
-  height: 100vh;
+  z-index: 1030;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-/* El menú móvil (Offcanvas) comparte colores y tipografía con la barra lateral. */
+.app-navbar-alta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.45rem 1rem;
+}
+
+.app-navbar-baja {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid #e2e8f0;
+  padding: 0.25rem 0.75rem;
+}
+
+.app-navbar-marca {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: var(--color-sidebar);
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+
+/* Empuja las acciones (backup, usuario, salir) hacia la derecha. */
+.app-navbar-acciones {
+  margin-left: auto;
+}
+
+/* Zona de enlaces de navegación (fila 2, escritorio). Sin overflow para que
+   los menús desplegables (position: absolute) nunca se recorten; si un ancho
+   muy estrecho ya no cabe, se envuelve en su propia línea. */
+.app-navbar-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+/* Enlaces de la navbar: pestañas directas y el toggle de los grupos. */
+.app-navbar-nav .nav-link {
+  color: #334155;
+  border-radius: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+.app-navbar-nav .nav-link:hover {
+  color: var(--color-sidebar-activo);
+  background: rgba(13, 110, 253, 0.08);
+}
+
+.app-navbar-nav .nav-link.activo,
+.app-navbar-nav .nav-link.active {
+  color: #fff;
+  background: var(--color-sidebar-activo);
+}
+
+/* Menús desplegables de los grupos. */
+.app-navbar .dropdown-menu {
+  border-radius: 0.55rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 6px 20px rgba(2, 6, 23, 0.14);
+  max-height: calc(100vh - 115px);
+  overflow-y: auto;
+}
+
+.app-navbar .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+}
+
+.app-navbar .dropdown-item.active {
+  background-color: var(--color-sidebar-activo);
+  color: #fff;
+}
+
+/* El menú móvil (Offcanvas) conserva colores y tipografía de la barra lateral. */
 .app-sidebar-offcanvas {
   background: var(--color-sidebar);
   color: #cbd5e1;
@@ -37,7 +121,6 @@ body {
   --bs-offcanvas-color: #cbd5e1;
 }
 
-.app-sidebar .marca,
 .app-sidebar-offcanvas .marca {
   padding: 1.1rem 1.25rem;
   font-weight: 700;
@@ -46,7 +129,6 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.app-sidebar .nav-link,
 .app-sidebar-offcanvas .nav-link {
   color: #cbd5e1;
   border-radius: 0.4rem;
@@ -57,13 +139,11 @@ body {
   gap: 0.6rem;
 }
 
-.app-sidebar .nav-link:hover,
 .app-sidebar-offcanvas .nav-link:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.06);
 }
 
-.app-sidebar .nav-link.activo,
 .app-sidebar-offcanvas .nav-link.activo {
   color: #fff;
   background: var(--color-sidebar-activo);
@@ -74,18 +154,6 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
-}
-
-.app-topbar {
-  background: #fff;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 0.75rem 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 10;
 }
 
 .app-main {
@@ -148,16 +216,15 @@ body {
   font-size: 0.85rem;
 }
 
-/* Caja (POS) */
-.pos-tarjeta-producto {
-  cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-  height: 100%;
+/* Caja móvil (<992px): la pantalla principal muestra la venta en curso como
+   lista táctil de ítems agregados; tocarla abre el carrito deslizante. */
+.caja-lista-venta .list-group-item {
+  min-height: 3.25rem;
+  border-left: 0;
+  border-right: 0;
 }
-
-.pos-tarjeta-producto:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+.caja-venta-vacia i {
+  color: var(--bs-secondary);
 }
 
 /* Caja: scroll independiente por panel (solo escritorio, >=992px).
@@ -253,6 +320,17 @@ body {
 .caja-panel-pie {
   background-color: var(--bs-secondary-bg);
   border-top: 1px solid var(--bs-border-color);
+}
+
+/* En móvil la tarjeta no puede quedar clavada al alto del panel deslizante
+   (el height:100% + overflow:hidden del escritorio recortaban el pie a la
+   altura de "Descuento adicional"): fluye con su contenido y el offcanvas
+   scrollea hasta los totales y el botón Cobrar. */
+@media (max-width: 991.98px) {
+  .caja-tarjeta-venta {
+    height: auto;
+    overflow: visible;
+  }
 }
 
 /* El buscador vive en una columna flexible de altura fija:
@@ -407,8 +485,7 @@ html.pos-activo *::-webkit-scrollbar-thumb:active {
 
 /* Impresión: oculta menú, topbar, pantalla y muestra el reporte en tablas. */
 @media print {
-  .app-sidebar,
-  .app-topbar,
+  .app-navbar,
   .offcanvas,
   .offcanvas-backdrop,
   .no-print,

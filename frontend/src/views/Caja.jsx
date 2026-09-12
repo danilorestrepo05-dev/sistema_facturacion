@@ -10,6 +10,8 @@ import { abrirTicketFactura, abrirPdfFactura } from '../services/impresion';
 import { useCarrito } from '../context/CarritoContext';
 import { useConfig } from '../context/ConfigContext';
 import { formatoMoneda } from '../utils/format';
+import BadgeEstadoDian from '../components/BadgeEstadoDian';
+import AlertaAuto from '../components/AlertaAuto';
 
 const TIPOS_PAGO = ['efectivo', 'tarjeta', 'transferencia', 'otro'];
 
@@ -110,6 +112,11 @@ const Caja = () => {
   const visadorActivo = estaHabilitado('visador_habilitado');
   // Con el arqueo activo se exige un turno abierto para vender (v0.9.24).
   const arqueoActivo = estaHabilitado('arqueo_habilitado');
+  // Facturación electrónica DIAN activa: se muestra el estado del documento.
+  const dianActivo = estaHabilitado('facturacion_electronica_habilitado');
+  // Modo estricto: con "Consumidor Final" deshabilitado la Caja exige elegir un
+  // cliente real antes de emitir la venta.
+  const exigeCliente = dianActivo && !estaHabilitado('dian_adquirente_consumidor');
 
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -298,6 +305,11 @@ const Caja = () => {
   };
 
   const emitir = async () => {
+    // Modo estricto: sin un cliente real elegido no se puede cobrar.
+    if (exigeCliente && !clienteId) {
+      setError('Seleccione un cliente real antes de cobrar (adquirente "Consumidor Final" deshabilitado)');
+      return;
+    }
     setGuardando(true);
     setError('');
     try {
@@ -319,6 +331,12 @@ const Caja = () => {
         }))
       });
       setEmitido(respuesta.data.datos);
+      // Con la facturación electrónica activa, el documento se procesa en
+      // segundo plano: hacemos un breve polling para mostrar el estado real
+      // (aprobada/local) en cuanto esté disponible, antes de imprimir.
+      if (dianActivo && respuesta.data.datos?.id) {
+        refrescarEstadoDian(respuesta.data.datos.id);
+      }
       // Si el carrito móvil estaba abierto, se cierra al emitir la factura.
       setCarritoMovil(false);
       // La pantalla del cliente muestra el total final y el agradecimiento.
@@ -339,6 +357,25 @@ const Caja = () => {
   const cerrarModalEmitido = () => {
     setEmitido(null);
     anunciarNuevaVenta();
+  };
+
+  // Consulta el estado DIAN de una factura recién emitida (procesamiento en
+  // segundo plano). Reintenta unas pocas veces mientras el estado es null y
+  // actualiza el modal de emisión para mostrar el badge real.
+  const refrescarEstadoDian = async (id, intento = 0) => {
+    try {
+      const respuesta = await api.get(`/facturas/${id}`);
+      const estado = respuesta.data.datos?.estado_dian;
+      // Actualiza el modal conservando el resto de datos de la factura.
+      if (estado) setEmitido((prev) => ({ ...prev, estado_dian: estado, cufe: respuesta.data.datos?.cufe }));
+      // Si todavía está procesando y no agotamos los intentos, lo esperamos un poco.
+      if (!estado && intento < 6) {
+        setTimeout(() => refrescarEstadoDian(id, intento + 1), 200);
+      }
+    } catch (err) {
+      // Si falla la consulta, no interrumpimos la emisión: el estado puede
+      // consultarse luego en el módulo de Facturas.
+    }
   };
 
   // Abre el ticket o el PDF de la factura recién emitida (token vía interceptor).
@@ -390,14 +427,17 @@ const Caja = () => {
             </div>
             <div className="d-flex align-items-center gap-2 mt-1 flex-wrap">
               <span className="small text-secondary">Cantidad:</span>
-              <Form.Control
-                type="number" size="sm" min={1} style={{ width: 90 }}
-                value={item.cantidad}
-                onChange={(e) => cambiarCantidad(item.producto_id, e.target.value)}
-                onWheel={(e) => e.currentTarget.blur()}
-              />
+              <CampoCantidad item={item} onCambiar={cambiarCantidad} ancho={90} />
               <span className="small text-secondary ms-2">Descuento $:</span>
               <CampoDescuento item={item} onCambiar={cambiarDescuento} />
+            </div>
+            <div className="d-flex align-items-center gap-2 mt-1 flex-wrap">
+              <span className="small text-secondary">Impuestos:</span>
+              <SelectorImpuestos
+                impuestos={item.impuestos || []}
+                catalogo={impuestos}
+                onChange={(nuevaLista) => cambiarImpuestos(item.producto_id, nuevaLista)}
+              />
             </div>
           </ListGroup.Item>
         ))}
@@ -413,7 +453,9 @@ const Caja = () => {
         <Col sm={6}>
           <Form.Label className="small">Cliente</Form.Label>
           <Form.Select size="sm" value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
-            <option value="">Consumidor final</option>
+            <option value="" disabled={exigeCliente}>
+              {exigeCliente ? 'Seleccione un cliente…' : 'Consumidor final'}
+            </option>
             {clientes.filter((c) => c.activo === 1).map((c) => (
               <option key={c.id} value={c.id}>{c.nombre}</option>
             ))}
@@ -431,6 +473,7 @@ const Caja = () => {
         <InputGroup.Text>Descuento adicional $</InputGroup.Text>
         <Form.Control type="number" min={0} value={descuento}
           onChange={(e) => setDescuento(e.target.value)}
+          onFocus={(e) => e.currentTarget.select()}
           onWheel={(e) => e.currentTarget.blur()} />
       </InputGroup>
       {ventaSinSaldo && (
@@ -525,12 +568,7 @@ const Caja = () => {
                   <div className="fw-semibold small">{item.nombre}</div>
                 </td>
                 <td>
-                  <Form.Control
-                    type="number" size="sm" min={1} style={{ width: 64 }}
-                    value={item.cantidad}
-                    onChange={(e) => cambiarCantidad(item.producto_id, e.target.value)}
-                    onWheel={(e) => e.currentTarget.blur()}
-                  />
+                  <CampoCantidad item={item} onCambiar={cambiarCantidad} />
                 </td>
                 <td className="text-end small">{formatoMoneda(item.precio)}</td>
                 <td>
@@ -577,7 +615,9 @@ const Caja = () => {
           <Form.Label className="small mb-0 text-secondary">Cliente</Form.Label>
           <Form.Select size="sm" style={{ minWidth: 180 }}
             value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
-            <option value="">Consumidor final</option>
+            <option value="" disabled={exigeCliente}>
+              {exigeCliente ? 'Seleccione un cliente…' : 'Consumidor final'}
+            </option>
             {clientes.filter((c) => c.activo === 1).map((c) => (
               <option key={c.id} value={c.id}>{c.nombre}</option>
             ))}
@@ -594,6 +634,7 @@ const Caja = () => {
           <Form.Control size="sm" type="number" min={0} style={{ width: 110 }}
             value={descuento}
             onChange={(e) => setDescuento(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
             onWheel={(e) => e.currentTarget.blur()} />
         </div>
       </div>
@@ -651,7 +692,7 @@ const Caja = () => {
           </Button>
         )}
       </div>
-      {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+      <AlertaAuto variante="danger" mensaje={error} onCerrar={() => setError('')} />
 
       {/* Estado del turno de caja (solo con arqueo activo, v0.9.24) */}
       {arqueoActivo && turnoInfo && (
@@ -761,8 +802,49 @@ const Caja = () => {
         </div>
       </div>
 
-      {/* Tabla de la venta: scrollea solo su contenido en escritorio */}
-      <div className="caja-zona-tabla">
+      {/* En móvil la pantalla principal muestra la venta en curso: cada ítem
+          agregado aparece como fila táctil (nombre, precio unitario, cantidad
+          y subtotal) y tocarla abre el panel deslizante para ajustarla y
+          cobrar. En escritorio este bloque se oculta (d-lg-none). */}
+      <div className="caja-lista-movil d-lg-none">
+        {carrito.length === 0 ? (
+          <div className="caja-venta-vacia text-center text-secondary py-5">
+            <i className="bi bi-cart d-block fs-1 mb-2"></i>
+            <div className="small">
+              Venta vacía: escanea o busca un producto para comenzar.<br />
+              Los ítems agregados aparecerán aquí.
+            </div>
+          </div>
+        ) : (
+          <ListGroup variant="flush" className="caja-lista-venta mb-3">
+            {carrito.map((item) => (
+              <ListGroup.Item key={item.producto_id} action
+                onClick={() => setCarritoMovil(true)}
+                aria-label={`Abrir el carrito para ajustar ${item.nombre}`}
+                className="d-flex justify-content-between align-items-center px-3 py-2">
+                <div className="me-3">
+                  <div className="fw-semibold small">{item.nombre}</div>
+                  <div className="text-secondary small">
+                    P. unitario {formatoMoneda(item.precio)} · Cantidad {item.cantidad}
+                  </div>
+                </div>
+                <div className="d-flex align-items-center gap-2">
+                  <strong className="small">
+                    {formatoMoneda(item.precio * item.cantidad - (Number(item.descuento) || 0))}
+                  </strong>
+                  <i className="bi bi-chevron-right text-secondary"></i>
+                </div>
+              </ListGroup.Item>
+            ))}
+          </ListGroup>
+        )}
+      </div>
+
+      {/* Tabla de la venta: scrollea solo su contenido en escritorio. En móvil
+          se oculta (d-none d-lg-block) porque el carrito se opera desde el
+          panel deslizante, evitando la tabla aplastada con sus encabezados
+          recortados ("Dto", "Total" fuera de pantalla). */}
+      <div className="caja-zona-tabla d-none d-lg-block">
         {tablaVenta}
       </div>
 
@@ -799,6 +881,18 @@ const Caja = () => {
           <div className="display-6 text-success mb-2"><i className="bi bi-check-circle-fill"></i></div>
           <h5>Factura No. {emitido?.numero_factura}</h5>
           <p className="text-secondary mb-0">Total: <strong>{formatoMoneda(emitido?.total)}</strong></p>
+          {dianActivo && (
+            <div className="mt-3">
+              <span className="text-secondary me-2 small">Facturación electrónica:</span>
+              <BadgeEstadoDian estado={emitido?.estado_dian} />
+              {(emitido?.estado_dian === 'local' || emitido?.estado_dian === 'rechazada') && (
+                <div className="small text-warning mt-1">
+                  El documento quedó pendiente de envío a la DIAN. Puedes reintentarlo desde el módulo
+                  <strong> Facturas</strong>.
+                </div>
+              )}
+            </div>
+          )}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-primary" onClick={() => imprimir('ticket', 80)}>
@@ -839,6 +933,56 @@ const FilaTotal = ({ etiqueta, valor }) => (
   </div>
 );
 
+// Input de cantidad con selección automática y buffer local: al enfocar la
+// casilla se marca el número completo (teclear reemplaza sin necesidad de
+// borrar) y mientras se edita el texto vive aquí. Al salir (blur) se normaliza
+// entre 1 y el stock; vacío restaura el valor previo y un "0" explícito
+// elimina la línea (misma regla que el carrito).
+const CampoCantidad = ({ item, onCambiar, ancho = 64 }) => {
+  const [texto, setTexto] = useState(String(item.cantidad));
+  const editando = useRef(false);
+
+  // Si la cantidad cambia por fuera (p. ej. se vuelve a agregar el mismo
+  // producto), el campo refleja el valor nuevo; no se pisa mientras editas.
+  useEffect(() => {
+    if (!editando.current) setTexto(String(item.cantidad));
+  }, [item.producto_id, item.cantidad]);
+
+  const alSalir = () => {
+    editando.current = false;
+    const crudo = String(texto).trim();
+    if (crudo === '0') {
+      onCambiar(item.producto_id, '0'); // 0 explícito → elimina la línea
+      return;
+    }
+    if (crudo === '') {
+      setTexto(String(item.cantidad)); // vacío → restaura el valor previo
+      return;
+    }
+    const limite = item.stock || 9999;
+    const n = Math.max(1, Math.min(Number(crudo) || 1, limite));
+    setTexto(String(n));
+    if (n !== Number(item.cantidad)) onCambiar(item.producto_id, String(n));
+  };
+
+  return (
+    <Form.Control
+      type="number" size="sm" min={1} style={{ width: ancho }}
+      value={texto}
+      onFocus={(e) => { editando.current = true; e.currentTarget.select(); }}
+      onChange={(e) => {
+        setTexto(e.target.value);
+        // Totales en vivo mientras el valor es un número válido; '' y '0'
+        // no se aplican aquí (se resuelven al salir del campo).
+        const n = Number(e.target.value);
+        if (e.target.value !== '' && n > 0) onCambiar(item.producto_id, e.target.value);
+      }}
+      onBlur={alSalir}
+      onWheel={(e) => e.currentTarget.blur()}
+    />
+  );
+};
+
 // Input de descuento por línea con borrador local: mientras el usuario teclea
 // el valor vive aquí (permite borrar y escribir sin que se reescriba un "0");
 // al salir del campo (blur) se normaliza entre 0 y el valor de la línea.
@@ -860,6 +1004,7 @@ const CampoDescuento = ({ item, onCambiar }) => {
         setTexto(e.target.value);
         onCambiar(item.producto_id, e.target.value); // totales en vivo (sin tope superior)
       }}
+      onFocus={(e) => e.currentTarget.select()}
       onBlur={alSalir}
       // La rueda del mouse sobre un input numérico enfocado cambia el valor
       // (paso por defecto: 1) y corrompe lo tecleado; al soltar el foco la

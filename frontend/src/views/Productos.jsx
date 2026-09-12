@@ -7,13 +7,19 @@ import {
 import api from '../services/api';
 import { formatoMoneda } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
+import { useConfig } from '../context/ConfigContext';
 import Paginacion from '../components/Paginacion';
+import AlertaAuto from '../components/AlertaAuto';
 
 const POR_PAGINA = 20;
 
 const Productos = () => {
   const { usuario } = useAuth();
   const esAdmin = usuario?.rol === 'admin';
+  // La fila de escaneo de códigos de barras del listado solo se muestra si el
+  // flag está activo (mismo patrón de Caja y Compras).
+  const { estaHabilitado } = useConfig();
+  const escaneoActivo = estaHabilitado('codigo_barras_habilitado');
 
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -21,8 +27,12 @@ const Productos = () => {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [termino, setTermino] = useState('');
+  const [codigoBuscado, setCodigoBuscado] = useState('');
   const [pagina, setPagina] = useState(1);
   const [paginas, setPaginas] = useState(0);
+  // La cámara se comparte entre el modal (llena form.codigo_barras) y la
+  // búsqueda del listado (filtra por código); el ref decide el destino.
+  const destinoCamara = useRef('form');
 
   const [modal, setModal] = useState(false);
   const [editando, setEditando] = useState(null); // null = crear
@@ -51,8 +61,16 @@ const Productos = () => {
         const lector = new BrowserMultiFormatReader();
         controles = await lector.decodeFromVideoDevice(undefined, videoRef.current, (resultado, err, ctrl) => {
           if (resultado && !cancelado) {
-            // Llena el campo del formulario con el código leído.
-            setForm((prev) => ({ ...prev, codigo_barras: resultado.getText() }));
+            if (destinoCamara.current === 'busqueda') {
+              // Modo búsqueda del listado: filtra por el código leído.
+              setCodigoBuscado(resultado.getText());
+              setTermino(resultado.getText());
+              setPagina(1);
+              cargar(resultado.getText(), 1);
+            } else {
+              // Modo formulario: llena el campo del producto.
+              setForm((prev) => ({ ...prev, codigo_barras: resultado.getText() }));
+            }
             setAvisoCamara('');
             setCamaraAbierta(false);
             ctrl?.stop();
@@ -84,12 +102,14 @@ const Productos = () => {
     return ((venta - compra) / compra) * 100;
   })();
 
-  const cargar = async () => {
+  // Carga la lista; acepta un término y página explícitos (p. ej. al disparar
+  // una pistola de códigos, donde el estado aún no se ha aplicado).
+  const cargar = async (terminoNuevo = termino, paginaNueva = pagina) => {
     setCargando(true);
     setError('');
     try {
       const [respProductos, respCategorias, respImpuestos] = await Promise.all([
-        api.get('/productos', { params: { termino, pagina, por_pagina: POR_PAGINA } }),
+        api.get('/productos', { params: { termino: terminoNuevo, pagina: paginaNueva, por_pagina: POR_PAGINA } }),
         api.get('/categorias'),
         api.get('/impuestos')
       ]);
@@ -201,7 +221,18 @@ const Productos = () => {
   const busqueda = (e) => {
     e.preventDefault();
     setPagina(1); // nueva búsqueda vuelve a la primera página
-    cargar();
+    cargar(termino, 1);
+  };
+
+  // La pistola USB escribe el código y envía Enter en la fila del listado:
+  // filtra los productos por ese código de barras sin enviar ningún formulario.
+  const teclaCodigoBuscado = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setTermino(codigoBuscado);
+      setPagina(1);
+      cargar(codigoBuscado, 1);
+    }
   };
 
   return (
@@ -215,15 +246,35 @@ const Productos = () => {
         )}
       </div>
 
-      {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+      <AlertaAuto variante="danger" mensaje={error} onCerrar={() => setError('')} />
 
       <Card className="card-kpi mb-3">
         <Card.Body>
           <Form onSubmit={busqueda} className="d-flex gap-2">
-            <Form.Control style={{ maxWidth: 320 }} placeholder="Buscar por código, nombre o categoría…"
+            <Form.Control style={{ maxWidth: 360 }}
+              placeholder="Buscar por código, código de barras, nombre o categoría…"
               value={termino} onChange={(e) => setTermino(e.target.value)} />
             <Button type="submit" variant="outline-primary"><i className="bi bi-search"></i></Button>
           </Form>
+
+          {/* Escaneo de códigos de barras en el listado (mismo patrón de Caja y
+              Compras): la pistola escribe el código y Enter filtra; la cámara
+              reutiliza el modal de escaneo en "modo búsqueda". */}
+          {escaneoActivo && (
+            <InputGroup className="mt-2" style={{ maxWidth: 440 }}>
+              <InputGroup.Text><i className="bi bi-upc-scan"></i></InputGroup.Text>
+              <Form.Control
+                placeholder="Código de barras (dispara la pistola o digita y presiona Enter)…"
+                value={codigoBuscado}
+                onChange={(e) => setCodigoBuscado(e.target.value)}
+                onKeyDown={teclaCodigoBuscado}
+              />
+              <Button variant="outline-primary" title="Escanear con la cámara"
+                onClick={() => { destinoCamara.current = 'busqueda'; setCamaraAbierta(true); }}>
+                <i className="bi bi-camera"></i>
+              </Button>
+            </InputGroup>
+          )}
         </Card.Body>
       </Card>
 
@@ -306,7 +357,7 @@ const Productos = () => {
                     onChange={(e) => setForm({ ...form, codigo_barras: e.target.value })}
                     onKeyDown={teclaCodigoBarras} />
                   <Button variant="outline-primary" type="button" title="Escanear con la cámara"
-                    onClick={() => setCamaraAbierta(true)}>
+                    onClick={() => { destinoCamara.current = 'form'; setCamaraAbierta(true); }}>
                     <i className="bi bi-camera"></i>
                   </Button>
                 </InputGroup>
