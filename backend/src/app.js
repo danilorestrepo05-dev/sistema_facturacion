@@ -16,6 +16,8 @@ const configRoutes = require('./routes/config.routes');
 const gavetaRoutes = require('./routes/gaveta.routes');
 const turnoRoutes = require('./routes/turno.routes');
 const compraRoutes = require('./routes/compra.routes');
+const dianRoutes = require('./routes/dian.routes');
+const notaRoutes = require('./routes/nota.routes');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -66,6 +68,12 @@ app.use('/api/v1/turnos', turnoRoutes);
 
 // Rutas de compras: ingreso de mercancía al inventario (solo admin).
 app.use('/api/v1/compras', compraRoutes);
+
+// Rutas de utilidades DIAN: cola de reintentos offline de facturación electrónica.
+app.use('/api/v1/dian', dianRoutes);
+
+// Rutas de notas correctivas (crédito y débito): creación, DIAN, PDF y ticket.
+app.use('/api/v1/notas', notaRoutes);
 
 // Ruta raíz informativa.
 app.get('/', (req, res) =>

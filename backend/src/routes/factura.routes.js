@@ -19,4 +19,7 @@ router.get('/:id/ticket', verificarToken, facturaController.descargarTicket);
 // Anulación: solo administrador (acción sensible que repone inventario).
 router.post('/:id/anular', verificarToken, verificarAdmin, facturaController.anular);
 
+// Facturación electrónica: fuerza el procesamiento DIAN del documento.
+router.post('/:id/dian', verificarToken, facturaController.procesarDian);
+
 module.exports = router;

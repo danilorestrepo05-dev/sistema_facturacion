@@ -2,9 +2,11 @@
 // Lógica de facturación: crear, listar, ver detalle y anular facturas.
 const facturaModel = require('../models/factura.model');
 const configModel = require('../models/config.model');
+const clienteModel = require('../models/cliente.model');
 const turnoModel = require('../models/turno.model');
 const pdfService = require('../services/pdf.service');
 const ticketService = require('../services/ticket.service');
+const dianService = require('../services/dian/dian.service');
 const { jsonExito, jsonError } = require('../utils/response');
 const { leerPaginacion, enviarCabeceras } = require('../utils/paginacion');
 
@@ -68,12 +70,45 @@ const crear = async (req, res, next) => {
       }
     }
 
+    // Facturación electrónica: validaciones del adquirente antes de emitir.
+    if ((config.facturacion_electronica_habilitado || '0') === '1') {
+      // Modo estricto: con "Consumidor Final" deshabilitado se exige cliente real.
+      if (Number(config.dian_adquirente_consumidor) === 0 && !cliente_id) {
+        return jsonError(
+          res,
+          'Facturación electrónica activa con adquirente "Consumidor Final" deshabilitado: debe seleccionar un cliente real',
+          400
+        );
+      }
+      // Un cliente real elegido siempre necesita su número de documento: es un
+      // dato obligatorio del adquirente en el documento electrónico.
+      if (cliente_id) {
+        const cliente = await clienteModel.buscarPorId(Number(cliente_id));
+        const nombreCliente = cliente && cliente.nombre ? cliente.nombre : 'Seleccionado';
+        if (!cliente || !cliente.documento) {
+          return jsonError(
+            res,
+            `El cliente "${nombreCliente}" no tiene documento registrado: ingrese su número de documento para facturar electrónicamente`,
+            400
+          );
+        }
+      }
+    }
+
     const factura = await facturaModel.crear({
       cliente_id: cliente_id || null,
       tipo_pago: tipo_pago || 'efectivo',
       descuento,
       items
     }, req.usuario.id);
+
+    // Facturación electrónica DIAN (no bloqueante): la venta ya quedó
+    // registrada; el documento electrónico se genera y encola en segundo plano.
+    if ((config.facturacion_electronica_habilitado || '0') === '1') {
+      dianService.procesarFactura(factura.id).catch((e) => {
+        console.error('[DIAN] Error en procesamiento en segundo plano:', e.message);
+      });
+    }
 
     return jsonExito(res, factura, 'Factura emitida correctamente', 201);
   } catch (err) {
@@ -139,6 +174,23 @@ const descargarTicket = async (req, res, next) => {
   }
 };
 
+// POST /api/v1/facturas/:id/dian
+// Genera el documento electrónico DIAN de una factura existente (útil para
+// reintentos o para probar sin conexión). No requiere stock ni caja.
+const procesarDian = async (req, res, next) => {
+  try {
+    const factura = await facturaModel.buscarPorId(req.params.id);
+    if (!factura) {
+      return jsonError(res, 'Factura no encontrada', 404);
+    }
+
+    const estado = await dianService.procesarFactura(factura.id);
+    return jsonExito(res, { estado }, 'Documento electrónico procesado');
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // Valida el cuerpo de una petición para crear una factura.
 function validarCreacion(datos) {
   if (!Array.isArray(datos.items) || datos.items.length === 0) {
@@ -184,4 +236,4 @@ function validarCreacion(datos) {
   return null;
 }
 
-module.exports = { listar, obtener, crear, anular, descargarPdf, descargarTicket };
+module.exports = { listar, obtener, crear, anular, descargarPdf, descargarTicket, procesarDian };

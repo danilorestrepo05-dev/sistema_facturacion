@@ -34,8 +34,12 @@ const listar = async ({ numero, cliente, estado, fecha_desde, fecha_hasta } = {}
 
   const consulta = `
     SELECT f.id, f.numero_factura, f.prefijo, f.cliente_id, c.nombre AS cliente_nombre,
+           c.documento AS cliente_documento, c.tipo_documento AS cliente_tipo_documento,
+           c.telefono AS cliente_telefono, c.email AS cliente_email,
+           c.direccion AS cliente_direccion,
            f.usuario_id, u.nombre_completo AS usuario_nombre, f.tipo_pago,
-           f.subtotal, f.impuesto_total, f.descuento, f.total, f.estado, f.creado_en
+           f.subtotal, f.impuesto_total, f.descuento, f.total, f.estado, f.creado_en,
+           f.cufe, f.estado_dian
     FROM facturas f
     LEFT JOIN clientes c ON c.id = f.cliente_id
     LEFT JOIN usuarios u ON u.id = f.usuario_id
@@ -97,8 +101,12 @@ const contar = async ({ numero, cliente, estado, fecha_desde, fecha_hasta } = {}
 const buscarPorId = async (id) => {
   const [factura] = await pool.query(
     `SELECT f.id, f.numero_factura, f.prefijo, f.cliente_id, c.nombre AS cliente_nombre,
-            c.documento AS cliente_documento, f.usuario_id, u.nombre_completo AS usuario_nombre,
-            f.tipo_pago, f.subtotal, f.impuesto_total, f.descuento, f.total, f.estado, f.creado_en
+            c.documento AS cliente_documento, c.tipo_documento AS cliente_tipo_documento,
+            c.telefono AS cliente_telefono, c.email AS cliente_email,
+            c.direccion AS cliente_direccion,
+            f.usuario_id, u.nombre_completo AS usuario_nombre,
+            f.tipo_pago, f.subtotal, f.impuesto_total, f.descuento, f.total, f.estado, f.creado_en,
+            f.cufe, f.estado_dian, f.xml_dian, f.resolucion_id
      FROM facturas f
      LEFT JOIN clientes c ON c.id = f.cliente_id
      LEFT JOIN usuarios u ON u.id = f.usuario_id
