@@ -2,23 +2,31 @@
 // Consulta de facturas: filtros, detalle, impresión y anulación.
 import { useEffect, useState } from 'react';
 import {
-  Row, Col, Card, Form, Button, Table, Badge, Spinner, Alert, Modal
+  Row, Col, Card, Form, Button, Table, Badge, Spinner, Modal
 } from 'react-bootstrap';
 import api from '../services/api';
 import { abrirTicketFactura, abrirPdfFactura } from '../services/impresion';
 import { formatoMoneda, formatoFechaHora } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
+import { useConfig } from '../context/ConfigContext';
 import Paginacion from '../components/Paginacion';
+import AlertaAuto from '../components/AlertaAuto';
+import BadgeEstadoDian from '../components/BadgeEstadoDian';
 
 const POR_PAGINA = 10;
 
 const Facturas = () => {
   const { usuario } = useAuth();
+  const { estaHabilitado } = useConfig();
   const esAdmin = usuario?.rol === 'admin';
+  // La columna de estado de facturación electrónica solo se muestra si la DIAN
+  // está activada en esta instalación.
+  const dianActivo = estaHabilitado('facturacion_electronica_habilitado');
 
   const [facturas, setFacturas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
 
   const [numero, setNumero] = useState('');
   const [cliente, setCliente] = useState('');
@@ -83,6 +91,20 @@ const Facturas = () => {
     }
   };
 
+  // Reintenta (o genera por primera vez) el documento electrónico DIAN.
+  // Útil en modo simulación y para facturas que quedaron 'local'/'rechazada'.
+  const reintentarDian = async (id) => {
+    setError('');
+    try {
+      const respuesta = await api.post(`/facturas/${id}/dian`);
+      await cargar();
+      if (detalle?.id === id) await verDetalle(id);
+      setMensaje(respuesta.data?.mensaje || 'Documento electrónico procesado');
+    } catch (err) {
+      setError(err.response?.data?.mensaje || 'Error al procesar el documento DIAN');
+    }
+  };
+
   // Abre el ticket o el PDF de una factura (el token lo adjunta el interceptor).
   const imprimir = async (tipo, id, valor = 'carta') => {
     setError('');
@@ -103,7 +125,8 @@ const Facturas = () => {
         <h4 className="mb-0">Facturas</h4>
       </div>
 
-      {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+      <AlertaAuto variante="danger" mensaje={error} onCerrar={() => setError('')} />
+      <AlertaAuto variante="success" mensaje={mensaje} onCerrar={() => setMensaje('')} />
 
       {/* Filtros */}
       <Card className="card-kpi mb-3">
@@ -156,12 +179,13 @@ const Facturas = () => {
                   <th>Pago</th>
                   <th className="text-end">Total</th>
                   <th>Estado</th>
+                  {dianActivo && <th>DIAN</th>}
                   <th className="text-end">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {visibles.length === 0 && (
-                  <tr><td colSpan={8} className="text-center text-secondary">Sin facturas</td></tr>
+                  <tr><td colSpan={dianActivo ? 9 : 8} className="text-center text-secondary">Sin facturas</td></tr>
                 )}
                 {visibles.map((f) => (
                   <tr key={f.id}>
@@ -176,6 +200,11 @@ const Facturas = () => {
                         {f.estado}
                       </Badge>
                     </td>
+                    {dianActivo && (
+                      <td>
+                        <BadgeEstadoDian estado={f.estado_dian} />
+                      </td>
+                    )}
                     <td className="text-end tabla-acciones">
                       <Button size="sm" variant="outline-primary" onClick={() => verDetalle(f.id)}>
                         <i className="bi bi-eye"></i>
@@ -186,6 +215,12 @@ const Facturas = () => {
                       <Button size="sm" variant="outline-danger" onClick={() => imprimir('pdf', f.id, formatoPdf)}>
                         <i className="bi bi-file-earmark-pdf"></i>
                       </Button>{' '}
+                      {dianActivo && (f.estado_dian === 'local' || f.estado_dian === 'rechazada') && (
+                        <Button size="sm" variant="outline-warning" title="Reintentar envío DIAN"
+                          onClick={() => reintentarDian(f.id)}>
+                          <i className="bi bi-arrow-repeat"></i>
+                        </Button>
+                      )}{' '}
                       {esAdmin && f.estado === 'emitida' && (
                         <Button size="sm" variant="outline-danger" onClick={() => anular(f.id)}>
                           <i className="bi bi-x-circle"></i>
@@ -222,6 +257,26 @@ const Facturas = () => {
                   <div><strong>Estado:</strong> <Badge bg={detalle.estado === 'emitida' ? 'success' : 'secondary'}>{detalle.estado}</Badge></div>
                 </Col>
               </Row>
+              {dianActivo && (
+                <div className="small mb-3 p-2 border rounded bg-light">
+                  <div className="d-flex align-items-center gap-2">
+                    <strong>Facturación electrónica:</strong>
+                    <BadgeEstadoDian estado={detalle.estado_dian} />
+                  </div>
+                  {detalle.cufe && (
+                    <div className="mt-1">
+                      <strong>CUFE:</strong>
+                      <code className="d-inline-block ms-1" style={{ overflowWrap: 'anywhere' }}>{detalle.cufe}</code>
+                    </div>
+                  )}
+                  {detalle.estado_dian === 'local' || detalle.estado_dian === 'rechazada' ? (
+                    <Button size="sm" variant="outline-warning" className="mt-2"
+                      onClick={() => reintentarDian(detalle.id)}>
+                      <i className="bi bi-arrow-repeat me-1"></i>Reintentar envío DIAN
+                    </Button>
+                  ) : null}
+                </div>
+              )}
               <Table responsive size="sm">
                 <thead>
                   <tr>

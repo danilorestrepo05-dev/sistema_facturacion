@@ -9,6 +9,7 @@ import Dashboard from './views/Dashboard';
 import Caja from './views/Caja';
 import Arqueo from './views/Arqueo';
 import Facturas from './views/Facturas';
+import Notas from './views/Notas';
 import Productos from './views/Productos';
 import Catalogo from './views/Catalogo';
 import Compras from './views/Compras';
@@ -46,6 +47,14 @@ const App = () => (
         <Route path="caja" element={<Caja />} />
         <Route path="arqueo" element={<Arqueo />} />
         <Route path="facturas" element={<Facturas />} />
+        <Route
+          path="notas"
+          element={
+            <RutaAdmin>
+              <Notas />
+            </RutaAdmin>
+          }
+        />
         <Route path="productos" element={<Productos />} />
         <Route path="catalogo" element={<Catalogo />} />
         <Route
